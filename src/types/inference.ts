@@ -20,7 +20,7 @@ export interface BatchInferenceRequest {
 	model_source: string;
 	model_type: ModelType;
 	base_model_id: string;
-	messages: Array<Array<DatasetMessage>>;
+	messages: DatasetMessage[][]; // Array of conversations, where each conversation is a list of messages
 	use_vllm?: boolean;
 }
 

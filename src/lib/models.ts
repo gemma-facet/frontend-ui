@@ -1,73 +1,3 @@
-// Google/Hugging Face models (base models)
-export const gemmaModelsPT = [
-	"google/gemma-3-1b-pt",
-	"google/gemma-3-4b-pt",
-	"google/gemma-3-12b-pt",
-	"google/gemma-3n-E2B",
-	"google/gemma-3n-E4B",
-	"google/gemma-3-270m",
-];
-
-export const gemmaModelsIT = [
-	"google/gemma-3-1b-it",
-	"google/gemma-3-4b-it",
-	"google/gemma-3-12b-it",
-	"google/gemma-3n-E2B-it",
-	"google/gemma-3n-E4B-it",
-	"google/gemma-3-270m-it",
-];
-
-// Unsloth models (standard)
-export const unslothModelsPT = [
-	"unsloth/gemma-3-1b-pt",
-	"unsloth/gemma-3-4b-pt",
-	"unsloth/gemma-3-12b-pt",
-	"unsloth/gemma-3n-E4B",
-	"unsloth/gemma-3n-E2B",
-];
-
-export const unslothModelsIT = [
-	"unsloth/gemma-3-1b-it",
-	"unsloth/gemma-3-4b-it",
-	"unsloth/gemma-3-12b-it",
-	"unsloth/gemma-3n-E4B-it",
-	"unsloth/gemma-3n-E2B-it",
-	"unsloth/gemma-3-270m-it",
-];
-
-// Unsloth 4-bit quantized models (dynamic quant)
-export const unsloth4BitModelsPT = [
-	"unsloth/gemma-3-1b-pt-unsloth-bnb-4bit",
-	"unsloth/gemma-3-4b-pt-unsloth-bnb-4bit",
-	"unsloth/gemma-3-12b-pt-unsloth-bnb-4bit",
-	"unsloth/gemma-3n-E4B-unsloth-bnb-4bit",
-	"unsloth/gemma-3n-E2B-unsloth-bnb-4bit",
-];
-
-export const unsloth4BitModelsIT = [
-	"unsloth/gemma-3-1b-it-unsloth-bnb-4bit",
-	"unsloth/gemma-3-4b-it-unsloth-bnb-4bit",
-	"unsloth/gemma-3-12b-it-unsloth-bnb-4bit",
-	"unsloth/gemma-3n-E4B-it-unsloth-bnb-4bit",
-	"unsloth/gemma-3n-E2B-it-unsloth-bnb-4bit",
-	"unsloth/gemma-3-270m-it-unsloth-bnb-4bit",
-];
-
-// All supported models (flat list for simple cases)
-export const supportedModels = [
-	...gemmaModelsPT,
-	...gemmaModelsIT,
-	...unslothModelsPT,
-	...unslothModelsIT,
-	...unsloth4BitModelsPT,
-	...unsloth4BitModelsIT,
-];
-
-export const providerLabel = {
-	huggingface: "Hugging Face",
-	unsloth: "Unsloth",
-} as const;
-
 export interface GemmaModel {
 	id: string;
 	name: string;
@@ -143,3 +73,37 @@ export type TrainingType = (typeof trainingTypes)[number]["id"];
 
 // Supported model IDs for evaluation and other components
 export const supportedModelIds = gemmaModels.map(model => model.id);
+
+/**
+ * Construct the full model ID based on base model, provider, and quantization method.
+ * NOTE: This is backward compatible, i.e. if you provide google/gemma-3-1b-it it will still work.
+ *
+ * @param baseModelId - Base model name (e.g., "gemma-3-1b-it")
+ * @param provider - Training provider ("unsloth" or "huggingface")
+ * @param method - Training method ("Full", "LoRA", "QLoRA")
+ * @returns Full model ID with proper namespace and quantization suffix
+ */
+export function constructFullModelId(
+	baseModelId: string,
+	provider: "unsloth" | "huggingface",
+	method = "LoRA",
+): string {
+	if (baseModelId.includes("/")) {
+		// Already a full model ID
+		return baseModelId;
+	}
+
+	if (provider === "huggingface") {
+		// For HuggingFace, always use google/ namespace
+		return `google/${baseModelId}`;
+	}
+	if (provider === "unsloth") {
+		// For Unsloth, use unsloth/ namespace
+		if (method === "QLoRA") {
+			// Default to unsloth dynamic quants
+			return `unsloth/${baseModelId}-unsloth-bnb-4bit`;
+		}
+		return `unsloth/${baseModelId}`;
+	}
+	throw new Error(`Unsupported provider: ${provider}`);
+}

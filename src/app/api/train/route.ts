@@ -15,7 +15,12 @@ export async function POST(request: Request) {
 			);
 		}
 
-		console.log(JSON.stringify(requestBody, null, 2));
+		const backendPayload = {
+			processed_dataset_id: requestBody.processed_dataset_id,
+			job_name: requestBody.job_name,
+			hf_token: hf_token,
+			training_config: requestBody.training_config,
+		};
 
 		const response = await backendFetch(
 			request,
@@ -25,7 +30,7 @@ export async function POST(request: Request) {
 				headers: {
 					"Content-Type": "application/json",
 				},
-				body: JSON.stringify(requestBody),
+				body: JSON.stringify(backendPayload),
 			},
 		);
 

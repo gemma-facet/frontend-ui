@@ -17,6 +17,7 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
+import { constructFullModelId } from "@/lib/models";
 import { useAtom } from "jotai";
 import { Pencil } from "lucide-react";
 import Link from "next/link";
@@ -64,11 +65,19 @@ export default function TrainingReviewPage() {
 
 		setError(null);
 		try {
+			// Construct the full model ID with training type suffix and proper provider/quantization
+			const baseModelWithType = `${model.modelId}-${model.trainingType}`;
+			config.base_model_id = constructFullModelId(
+				baseModelWithType,
+				model.provider,
+				config.method,
+			);
+
 			const payload = {
 				processed_dataset_id: datasetId,
 				job_name: jobName,
 				hf_token: hfToken,
-				training_config: config, // Use the config directly as it already matches TrainingConfig
+				training_config: config,
 			};
 
 			const res = await fetch("/api/train", {
@@ -129,11 +138,11 @@ export default function TrainingReviewPage() {
 						editLink: "/dashboard/training/new/model",
 					})}
 					{SummaryRow({
-						label: "Training Type",
+						label: "Model Type",
 						value:
 							model.trainingType === "it"
-								? "Instruction Tuning (IT)"
-								: "Pre-training (PT)",
+								? "Instruction-tuned (IT)"
+								: "Pre-trained (PT)",
 						editLink: "/dashboard/training/new/model",
 					})}
 					{SummaryRow({

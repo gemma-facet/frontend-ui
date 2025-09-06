@@ -189,7 +189,10 @@ export const evaluationModeAtom = atom<EvaluationMode | null>(null);
 
 export type SelectedModel = {
 	type: "base" | "trained";
-	modelId?: string; // For base models
+	baseModelId?: string; // Store the original base model ID (e.g., "gemma-3-1b")
+	useUnsloth?: boolean; // Whether Unsloth provider is used
+	useQuantization?: boolean; // Whether quantization is enabled
+	usePreTrained?: boolean; // Whether to use -pt instead of -it models
 	job?: TrainingJob; // For trained models
 };
 

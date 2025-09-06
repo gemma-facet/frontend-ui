@@ -84,7 +84,7 @@ export default function ModelSelectionPage() {
 			{/* Configuration Section */}
 			<div className="grid gap-6 md:grid-cols-2 mb-6">
 				<div className="space-y-2">
-					<div className="text-sm font-medium">Training Type</div>
+					<div className="text-sm font-medium">Model Type</div>
 					<Select
 						value={selectedTrainingType}
 						onValueChange={(value: TrainingType) =>

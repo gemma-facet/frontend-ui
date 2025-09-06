@@ -25,6 +25,7 @@ import {
 	getGroundTruth,
 	getInferenceMessages,
 } from "@/lib/dataset-adapters";
+import { constructFullModelId } from "@/lib/models";
 import type {
 	DatasetDetail,
 	DatasetMessage,
@@ -52,7 +53,10 @@ interface UnifiedEvaluationFormProps {
 	job?: TrainingJob;
 	modelSource?: string;
 	modelType?: ModelType;
-	baseModelId?: string;
+	baseModelId?: string; // This should be the original base model ID (e.g., "gemma-3-270m")
+	useUnsloth?: boolean; // Whether Unsloth provider is used
+	useQuantization?: boolean; // Whether quantization is enabled
+	usePreTrained?: boolean; // Whether to use -pt instead of -it models
 	initialDatasetId?: string;
 	isComparison?: boolean;
 	modelLabel?: string;
@@ -95,16 +99,38 @@ export default function UnifiedEvaluationForm({
 	modelSource,
 	modelType,
 	baseModelId,
+	useUnsloth,
+	useQuantization,
+	usePreTrained,
 	initialDatasetId,
-	isComparison = false,
+	isComparison,
 	modelLabel,
 	sharedDatasetId,
 	evaluationMode,
 	preSelectedSamples,
 }: UnifiedEvaluationFormProps) {
-	const effectiveBaseModelId = baseModelId || job?.base_model_id;
+	const originalBaseModelId = baseModelId || job?.base_model_id;
 	const effectiveDatasetId =
 		sharedDatasetId || initialDatasetId || job?.processed_dataset_id || "";
+
+	// Reconstruct the full base_model_id based on user choices (unsloth/quantization/pretraining)
+	const reconstructedBaseModelId = originalBaseModelId
+		? (() => {
+				// If it's a base model, construct the full model ID with user choices
+				if (modelType === "base") {
+					const provider = useUnsloth ? "unsloth" : "huggingface";
+					const method = useQuantization ? "QLoRA" : "LoRA";
+					const trainingType = usePreTrained ? "pt" : "it";
+					return constructFullModelId(
+						`${originalBaseModelId}-${trainingType}`,
+						provider,
+						method,
+					);
+				}
+				// For trained models, use the original base model ID or the job's base model
+				return originalBaseModelId;
+			})()
+		: "";
 
 	const [dataset, setDataset] = useState<string>(effectiveDatasetId);
 	const [evaluationType, setEvaluationType] = useState<string>("task");
@@ -144,7 +170,7 @@ export default function UnifiedEvaluationForm({
 	}
 
 	const provider =
-		effectiveBaseModelId?.split("/")[0] === "unsloth"
+		reconstructedBaseModelId?.split("/")[0] === "unsloth"
 			? "unsloth"
 			: "huggingface";
 
@@ -242,11 +268,15 @@ export default function UnifiedEvaluationForm({
 				return;
 			}
 
-			if (!modelSource || !modelType || !effectiveBaseModelId) {
+			if (!modelSource || !modelType || !reconstructedBaseModelId) {
 				throw new Error(
 					"Evaluation requires a model source, model type, and base model ID",
 				);
 			}
+
+			// For base models, use the reconstructed base model ID as the model source
+			const effectiveModelSource =
+				modelType === "base" ? reconstructedBaseModelId : modelSource;
 
 			const endpoint =
 				evaluationMode === "metrics"
@@ -258,9 +288,9 @@ export default function UnifiedEvaluationForm({
 			if (evaluationMode === "metrics") {
 				if (evaluationType === "task") {
 					requestBody = {
-						model_source: modelSource,
+						model_source: effectiveModelSource,
 						model_type: modelType,
-						base_model_id: effectiveBaseModelId,
+						base_model_id: reconstructedBaseModelId,
 						dataset_id: dataset,
 						task_type: taskType,
 						max_samples: maxSamples,
@@ -271,9 +301,9 @@ export default function UnifiedEvaluationForm({
 				} else {
 					// metrics-based evaluation
 					requestBody = {
-						model_source: modelSource,
+						model_source: effectiveModelSource,
 						model_type: modelType,
-						base_model_id: effectiveBaseModelId,
+						base_model_id: reconstructedBaseModelId,
 						dataset_id: dataset,
 						metrics: Array.from(selectedMetrics),
 						max_samples: maxSamples,
@@ -283,11 +313,15 @@ export default function UnifiedEvaluationForm({
 					};
 				}
 			} else {
+				// For batch inference, convert samples to message arrays
 				requestBody = {
-					model_source: modelSource,
+					model_source: effectiveModelSource,
 					model_type: modelType,
-					base_model_id: effectiveBaseModelId,
-					messages: selected.map(s => getInferenceMessages(s)),
+					base_model_id: reconstructedBaseModelId,
+					messages: selected.map(sample => {
+						const messages = getInferenceMessages(sample);
+						return messages;
+					}),
 					hf_token: hfToken,
 					use_vllm: useVllm,
 				};
@@ -356,7 +390,7 @@ export default function UnifiedEvaluationForm({
 					{/* Model Information Display */}
 					{(modelSource ||
 						modelType ||
-						effectiveBaseModelId ||
+						reconstructedBaseModelId ||
 						job) && (
 						<div className="p-4 bg-muted/30 rounded-lg border">
 							<div className="text-sm font-semibold mb-3 text-muted-foreground">
@@ -379,27 +413,27 @@ export default function UnifiedEvaluationForm({
 										</span>
 									</div>
 								)}
-								{effectiveBaseModelId && (
+								{reconstructedBaseModelId && (
 									<div>
 										<span className="font-medium">
 											Model ID:
 										</span>{" "}
 										<span className="text-muted-foreground font-mono text-xs">
-											{effectiveBaseModelId}
+											{reconstructedBaseModelId}
 										</span>
 									</div>
 								)}
-								{modelSource && (
+								{(modelType === "base"
+									? reconstructedBaseModelId
+									: modelSource) && (
 									<div>
 										<span className="font-medium">
 											Source:
 										</span>{" "}
-										<span className="text-muted-foreground capitalize">
-											{modelSource === "huggingface"
-												? "Hugging Face Hub"
-												: modelSource === "gcs"
-													? "Google Cloud Storage"
-													: modelSource}
+										<span className="text-muted-foreground font-mono text-xs">
+											{modelType === "base"
+												? reconstructedBaseModelId
+												: modelSource}
 										</span>
 									</div>
 								)}

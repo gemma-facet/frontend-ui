@@ -7,14 +7,17 @@ import { RadioCardGroup, RadioCardGroupItem } from "@/components/ui/radio-card";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useTrainingJobs } from "@/hooks/useTrainingJobs";
-import { supportedModels } from "@/lib/models";
+import { gemmaModels } from "@/lib/models";
 import type { TrainingJob } from "@/types/training";
 import { Loader2 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export interface SelectedModel {
 	type: "base" | "trained";
-	modelId?: string;
+	baseModelId?: string; // Store the original base model ID (e.g., "gemma-3-1b")
+	useUnsloth?: boolean;
+	useQuantization?: boolean;
+	usePreTrained?: boolean; // Whether to use -pt instead of -it models
 	job?: TrainingJob;
 }
 
@@ -39,6 +42,9 @@ export default function ModelSelector({
 	onComparisonChange,
 }: ModelSelectorProps) {
 	const [activeTab, setActiveTab] = useState<"base" | "trained">("base");
+	const [useUnsloth, setUseUnsloth] = useState(true);
+	const [useQuantization, setUseQuantization] = useState(false);
+	const [usePreTrained, setUsePreTrained] = useState(false);
 	const {
 		jobs,
 		loading: jobsLoading,
@@ -54,6 +60,21 @@ export default function ModelSelector({
 		model2: null,
 	};
 
+	// Sync toggle states with selected model props
+	useEffect(() => {
+		if (selectedModel?.type === "base") {
+			if (selectedModel.useUnsloth !== undefined) {
+				setUseUnsloth(selectedModel.useUnsloth);
+			}
+			if (selectedModel.useQuantization !== undefined) {
+				setUseQuantization(selectedModel.useQuantization);
+			}
+			if (selectedModel.usePreTrained !== undefined) {
+				setUsePreTrained(selectedModel.usePreTrained);
+			}
+		}
+	}, [selectedModel]);
+
 	// Only show jobs with completed status (detailed info will be fetched when selected)
 	const availableJobs = jobs.filter(job => job.status === "completed");
 
@@ -67,8 +88,80 @@ export default function ModelSelector({
 		}
 	};
 
+	const handleUnslothToggle = (checked: boolean) => {
+		setUseUnsloth(checked);
+		// Update existing selections with new provider
+		updateExistingSelections(checked, useQuantization, usePreTrained);
+	};
+
+	const handleQuantizationToggle = (checked: boolean) => {
+		setUseQuantization(checked);
+		// Update existing selections with new quantization
+		updateExistingSelections(useUnsloth, checked, usePreTrained);
+	};
+
+	const handlePreTrainedToggle = (checked: boolean) => {
+		setUsePreTrained(checked);
+		// Update existing selections with new training type
+		updateExistingSelections(useUnsloth, useQuantization, checked);
+	};
+
+	const updateExistingSelections = (
+		unsloth: boolean,
+		quantization: boolean,
+		preTrained: boolean,
+	) => {
+		// Update single selection
+		if (selectedModel?.type === "base" && selectedModel.baseModelId) {
+			const updatedModel = {
+				...selectedModel,
+				useUnsloth: unsloth,
+				useQuantization: quantization,
+				usePreTrained: preTrained,
+			};
+			onModelSelect?.(updatedModel);
+		}
+
+		// Update comparison selections
+		if (isComparisonMode && onComparisonChange) {
+			const updatedComparison = { ...currentComparison };
+
+			if (
+				currentComparison.model1?.type === "base" &&
+				currentComparison.model1.baseModelId
+			) {
+				updatedComparison.model1 = {
+					...currentComparison.model1,
+					useUnsloth: unsloth,
+					useQuantization: quantization,
+					usePreTrained: preTrained,
+				};
+			}
+
+			if (
+				currentComparison.model2?.type === "base" &&
+				currentComparison.model2.baseModelId
+			) {
+				updatedComparison.model2 = {
+					...currentComparison.model2,
+					useUnsloth: unsloth,
+					useQuantization: quantization,
+					usePreTrained: preTrained,
+				};
+			}
+
+			onComparisonChange(updatedComparison);
+		}
+	};
+
 	const handleBaseModelSelect = (modelId: string, modelSlot?: 1 | 2) => {
-		const newModel: SelectedModel = { type: "base", modelId };
+		const newModel: SelectedModel = {
+			type: "base",
+			baseModelId: modelId, // Store the original base model ID
+			useUnsloth,
+			useQuantization,
+			usePreTrained,
+		};
 
 		if (isComparisonMode && onComparisonChange) {
 			// In comparison mode, update the specific model slot
@@ -121,6 +214,71 @@ export default function ModelSelector({
 			<CardContent>
 				{isComparisonMode ? (
 					<div className="space-y-6">
+						{/* Model Configuration Toggles for Comparison Mode */}
+						<div className="space-y-3 p-4 bg-muted/50 rounded-lg">
+							<h4 className="font-medium text-sm">
+								Model Options (Applied to Base Models Only)
+							</h4>
+							<div className="grid grid-cols-3 gap-4">
+								<div className="flex items-center justify-between">
+									<div className="space-y-0.5">
+										<Label
+											htmlFor="comp-use-unsloth"
+											className="text-sm"
+										>
+											Use Unsloth
+										</Label>
+										<p className="text-xs text-muted-foreground">
+											Optimized for faster training
+										</p>
+									</div>
+									<Switch
+										id="comp-use-unsloth"
+										checked={useUnsloth}
+										onCheckedChange={handleUnslothToggle}
+									/>
+								</div>
+								<div className="flex items-center justify-between">
+									<div className="space-y-0.5">
+										<Label
+											htmlFor="comp-use-quantization"
+											className="text-sm"
+										>
+											4-bit Quantization
+										</Label>
+										<p className="text-xs text-muted-foreground">
+											Reduce memory usage (QLoRA)
+										</p>
+									</div>
+									<Switch
+										id="comp-use-quantization"
+										checked={useQuantization}
+										onCheckedChange={
+											handleQuantizationToggle
+										}
+									/>
+								</div>
+								<div className="flex items-center justify-between">
+									<div className="space-y-0.5">
+										<Label
+											htmlFor="comp-use-pretrained"
+											className="text-sm"
+										>
+											Use Pre-trained
+										</Label>
+										<p className="text-xs text-muted-foreground">
+											Use -pt models instead of -it
+										</p>
+									</div>
+									<Switch
+										id="comp-use-pretrained"
+										checked={usePreTrained}
+										onCheckedChange={handlePreTrainedToggle}
+									/>
+								</div>
+							</div>
+						</div>
+
 						<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 							{/* Model 1 Selection */}
 							<div className="space-y-4">
@@ -154,7 +312,7 @@ export default function ModelSelector({
 												currentComparison.model1
 													?.type === "base"
 													? currentComparison.model1
-															.modelId
+															.baseModelId
 													: ""
 											}
 											onValueChange={modelId =>
@@ -164,14 +322,19 @@ export default function ModelSelector({
 												)
 											}
 										>
-											{supportedModels.map(model => (
+											{gemmaModels.map(model => (
 												<RadioCardGroupItem
-													key={model}
-													value={model}
+													key={model.id}
+													value={model.id}
 													className="p-3"
 												>
-													<div className="font-mono text-sm">
-														{model}
+													<div className="space-y-1">
+														<div className="font-medium text-sm">
+															{model.name}
+														</div>
+														<div className="text-xs text-muted-foreground">
+															{model.description}
+														</div>
 													</div>
 												</RadioCardGroupItem>
 											))}
@@ -254,7 +417,7 @@ export default function ModelSelector({
 												currentComparison.model2
 													?.type === "base"
 													? currentComparison.model2
-															.modelId
+															.baseModelId
 													: ""
 											}
 											onValueChange={modelId =>
@@ -264,14 +427,19 @@ export default function ModelSelector({
 												)
 											}
 										>
-											{supportedModels.map(model => (
+											{gemmaModels.map(model => (
 												<RadioCardGroupItem
-													key={model}
-													value={model}
+													key={model.id}
+													value={model.id}
 													className="p-3"
 												>
-													<div className="font-mono text-sm">
-														{model}
+													<div className="space-y-1">
+														<div className="font-medium text-sm">
+															{model.name}
+														</div>
+														<div className="text-xs text-muted-foreground">
+															{model.description}
+														</div>
 													</div>
 												</RadioCardGroupItem>
 											))}
@@ -341,31 +509,100 @@ export default function ModelSelector({
 						<TabsContent value="base" className="space-y-4">
 							<p className="text-sm text-muted-foreground">
 								Select from supported base models for
-								evaluation.
+								evaluation. Use the options below to configure
+								the model.
 							</p>
 							<RadioCardGroup
 								className="grid grid-cols-1 md:grid-cols-2 gap-3"
 								value={
 									selectedModel?.type === "base"
-										? selectedModel.modelId
+										? selectedModel.baseModelId
 										: ""
 								}
 								onValueChange={modelId =>
 									handleBaseModelSelect(modelId)
 								}
 							>
-								{supportedModels.map(model => (
+								{gemmaModels.map(model => (
 									<RadioCardGroupItem
-										key={model}
-										value={model}
+										key={model.id}
+										value={model.id}
 										className="p-3"
 									>
-										<div className="font-mono text-sm">
-											{model}
+										<div className="space-y-1">
+											<div className="font-medium text-sm">
+												{model.name}
+											</div>
+											<div className="text-xs text-muted-foreground">
+												{model.description}
+											</div>
 										</div>
 									</RadioCardGroupItem>
 								))}
 							</RadioCardGroup>
+
+							{/* Model Configuration Toggles */}
+							<div className="space-y-3 p-4 bg-muted/50 rounded-lg">
+								<h4 className="font-medium text-sm">
+									Model Options
+								</h4>
+								<div className="flex items-center justify-between">
+									<div className="space-y-0.5">
+										<Label
+											htmlFor="use-unsloth"
+											className="text-sm"
+										>
+											Use Unsloth
+										</Label>
+										<p className="text-xs text-muted-foreground">
+											Optimized for faster training
+										</p>
+									</div>
+									<Switch
+										id="use-unsloth"
+										checked={useUnsloth}
+										onCheckedChange={handleUnslothToggle}
+									/>
+								</div>
+								<div className="flex items-center justify-between">
+									<div className="space-y-0.5">
+										<Label
+											htmlFor="use-quantization"
+											className="text-sm"
+										>
+											4-bit Quantization
+										</Label>
+										<p className="text-xs text-muted-foreground">
+											Reduce memory usage (QLoRA)
+										</p>
+									</div>
+									<Switch
+										id="use-quantization"
+										checked={useQuantization}
+										onCheckedChange={
+											handleQuantizationToggle
+										}
+									/>
+								</div>
+								<div className="flex items-center justify-between">
+									<div className="space-y-0.5">
+										<Label
+											htmlFor="use-pretrained"
+											className="text-sm"
+										>
+											Use Pre-trained
+										</Label>
+										<p className="text-xs text-muted-foreground">
+											Use -pt models instead of -it
+										</p>
+									</div>
+									<Switch
+										id="use-pretrained"
+										checked={usePreTrained}
+										onCheckedChange={handlePreTrainedToggle}
+									/>
+								</div>
+							</div>
 						</TabsContent>
 
 						<TabsContent value="trained" className="space-y-4">

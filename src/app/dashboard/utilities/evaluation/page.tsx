@@ -48,7 +48,9 @@ export default function EvaluationsPage() {
 
 		if (model.type === "base") {
 			modelType = "base";
-			modelSource = model.modelId || "";
+			// For base models, modelSource should be the same as the constructed base_model_id
+			// This will be constructed in the unified evaluation form
+			modelSource = model.baseModelId || "";
 		} else if (model.type === "trained" && jobDetails?.adapter_path) {
 			// For trained models, we need to determine if user wants adapter or merged model
 			// TODO: This logic should be enhanced to let users choose between adapter/merged
@@ -70,10 +72,12 @@ export default function EvaluationsPage() {
 			job: model.type === "trained" ? jobDetails || model.job : undefined,
 			modelSource: modelSource,
 			modelType: modelType,
-			baseModelId:
-				model.type === "base"
-					? model.modelId
-					: jobDetails?.base_model_id || model.job?.base_model_id,
+			baseModelId: model.baseModelId, // Use the simple baseModelId from model selector
+			useUnsloth: model.type === "base" ? model.useUnsloth : undefined,
+			useQuantization:
+				model.type === "base" ? model.useQuantization : undefined,
+			usePreTrained:
+				model.type === "base" ? model.usePreTrained : undefined,
 			initialDatasetId:
 				model.type === "trained"
 					? jobDetails?.processed_dataset_id ||
