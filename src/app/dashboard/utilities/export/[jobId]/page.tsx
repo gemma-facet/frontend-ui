@@ -36,21 +36,13 @@ export default function ExportJobDetailPage() {
 			setError(null);
 
 			try {
-				const response = await fetch("/api/export/jobs");
+				const response = await fetch(`/api/export/jobs/${jobId}`);
 				if (!response.ok) {
-					throw new Error("Failed to fetch export jobs");
+					throw new Error("Failed to fetch export job");
 				}
 
-				const data = await response.json();
-				const foundJob = data.jobs.find(
-					(j: ExportJob) => j.job_id === jobId,
-				);
-
-				if (foundJob) {
-					setJob(foundJob);
-				} else {
-					setError("Export job not found");
-				}
+				const data: ExportJob = await response.json();
+				setJob(data);
 			} catch (err: unknown) {
 				setError(err instanceof Error ? err.message : "Unknown error");
 			} finally {
@@ -68,28 +60,17 @@ export default function ExportJobDetailPage() {
 			setError(null);
 
 			try {
-				const response = await fetch("/api/export/jobs");
+				const response = await fetch(`/api/export/jobs/${jobId}`);
 				if (!response.ok) {
-					throw new Error("Failed to fetch export jobs");
+					throw new Error("Failed to fetch export job");
 				}
 
-				const data = await response.json();
-				const foundJob = data.jobs.find(
-					(j: ExportJob) => j.job_id === jobId,
-				);
+				const data: ExportJob = await response.json();
+				setJob(data);
 
-				if (foundJob) {
-					setJob(foundJob);
-
-					// If export_status is not null, start polling
-					if (foundJob.export_status && !manual) {
-						polling.current = setTimeout(
-							() => fetchJobStatus(),
-							10000,
-						);
-					}
-				} else {
-					setError("Export job not found");
+				// If export_status is not null, start polling
+				if (data.export_status && !manual) {
+					polling.current = setTimeout(() => fetchJobStatus(), 10000);
 				}
 			} catch (err: unknown) {
 				setError(err instanceof Error ? err.message : String(err));
@@ -232,39 +213,6 @@ export default function ExportJobDetailPage() {
 				)}
 			</div>
 
-			{/* Status Banner */}
-			<div
-				className={cn(
-					"p-4 rounded-lg border",
-					isExporting
-						? "bg-amber-50 border-amber-200"
-						: "bg-emerald-50 border-emerald-200",
-				)}
-			>
-				<div className="flex items-center gap-3">
-					<div
-						className={cn(
-							"w-3 h-3 rounded-full",
-							isExporting
-								? "bg-amber-500 animate-pulse"
-								: "bg-emerald-500",
-						)}
-					/>
-					<div>
-						<p className="font-medium text-gray-900">
-							{isExporting
-								? `Exporting ${job.export_status}...`
-								: "Ready for export"}
-						</p>
-						<p className="text-sm text-muted-foreground">
-							{isExporting
-								? "Export in progress, please wait..."
-								: "All export types are available"}
-						</p>
-					</div>
-				</div>
-			</div>
-
 			{/* Job Information */}
 			<Card>
 				<CardHeader>
@@ -336,7 +284,7 @@ export default function ExportJobDetailPage() {
 									className="w-full"
 									size="sm"
 								>
-									<Download className="w-4 h-4 mr-2" />
+									<Download />
 									Download
 								</Button>
 							) : (
@@ -351,7 +299,7 @@ export default function ExportJobDetailPage() {
 								>
 									{exportLoading === "adapter" ? (
 										<>
-											<Loader2 className="w-4 h-4 mr-2 animate-spin" />
+											<Loader2 className="animate-spin" />
 											Creating...
 										</>
 									) : (
@@ -394,7 +342,7 @@ export default function ExportJobDetailPage() {
 									className="w-full"
 									size="sm"
 								>
-									<Download className="w-4 h-4 mr-2" />
+									<Download />
 									Download
 								</Button>
 							) : (
@@ -409,7 +357,7 @@ export default function ExportJobDetailPage() {
 								>
 									{exportLoading === "merged" ? (
 										<>
-											<Loader2 className="w-4 h-4 mr-2 animate-spin" />
+											<Loader2 className="animate-spin" />
 											Creating...
 										</>
 									) : (
@@ -452,7 +400,7 @@ export default function ExportJobDetailPage() {
 									className="w-full"
 									size="sm"
 								>
-									<Download className="w-4 h-4 mr-2" />
+									<Download />
 									Download
 								</Button>
 							) : (
@@ -465,7 +413,7 @@ export default function ExportJobDetailPage() {
 								>
 									{exportLoading === "gguf" ? (
 										<>
-											<Loader2 className="w-4 h-4 mr-2 animate-spin" />
+											<Loader2 className="animate-spin" />
 											Creating...
 										</>
 									) : (
