@@ -18,4 +18,19 @@ export interface ExportJobsResponse {
 	jobs: ExportJob[];
 }
 
-export type ExportStatus = "adapter" | "merged" | "gguf";
+export type ExportType = "adapter" | "merged" | "gguf";
+
+export interface ExportRequest {
+	job_id: string;
+	export_type: ExportType;
+	hf_token?: string;
+}
+
+export interface ExportInfo {
+	type: ExportType;
+	path: string;
+}
+
+export interface ExportResponse {
+	export_info: ExportInfo;
+}

@@ -24,7 +24,11 @@ export default function ExportJobDetailPage() {
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 	const [refreshing, setRefreshing] = useState(false);
-	const [exportLoading, setExportLoading] = useState<string | null>(null);
+	const [isWaitingForResponse, setIsWaitingForResponse] = useState(false);
+	const [currentlyProcessingType, setCurrentlyProcessingType] = useState<
+		"adapter" | "merged" | "gguf" | null
+	>(null);
+	const [isPolling, setIsPolling] = useState(false);
 
 	const cancelled = useRef(false);
 	const polling = useRef<NodeJS.Timeout | null>(null);
@@ -55,9 +59,11 @@ export default function ExportJobDetailPage() {
 
 	const fetchJobStatus = useCallback(
 		async (manual = false) => {
-			if (manual) setRefreshing(true);
-			setLoading(true);
-			setError(null);
+			if (manual) {
+				setRefreshing(true);
+			} else {
+				setIsPolling(true);
+			}
 
 			try {
 				const response = await fetch(`/api/export/jobs/${jobId}`);
@@ -68,15 +74,18 @@ export default function ExportJobDetailPage() {
 				const data: ExportJob = await response.json();
 				setJob(data);
 
-				// If export_status is not null, start polling
+				// If export_status is not null and this is not a manual refresh, schedule next poll
 				if (data.export_status && !manual) {
 					polling.current = setTimeout(() => fetchJobStatus(), 10000);
 				}
 			} catch (err: unknown) {
 				setError(err instanceof Error ? err.message : String(err));
 			} finally {
-				setLoading(false);
-				if (manual) setRefreshing(false);
+				if (manual) {
+					setRefreshing(false);
+				} else {
+					setIsPolling(false);
+				}
 			}
 		},
 		[jobId],
@@ -107,46 +116,35 @@ export default function ExportJobDetailPage() {
 	const handleExportRequest = async (
 		exportType: "adapter" | "merged" | "gguf",
 	) => {
-		if (!job || job.export_status) return;
+		if (!job || job.export_status || isWaitingForResponse) return;
 
-		setExportLoading(exportType);
+		setIsWaitingForResponse(true);
+		setCurrentlyProcessingType(exportType);
 
 		try {
-			// Simulate API call
-			await new Promise(resolve => setTimeout(resolve, 2000));
+			const response = await fetch("/api/export", {
+				method: "POST",
+				headers: { "Content-Type": "application/json" },
+				body: JSON.stringify({
+					job_id: job.job_id,
+					export_type: exportType,
+					hf_token: undefined, // Add HF token if needed
+				}),
+			});
 
-			// Update job status to show export in progress
-			setJob(prev =>
-				prev
-					? {
-							...prev,
-							export_status: exportType,
-						}
-					: null,
-			);
+			if (!response.ok) {
+				const errorData = await response.json();
+				throw new Error(errorData.error || "Export request failed");
+			}
 
-			toast.success(`${exportType} export started`);
-
-			// Simulate export completion after 5 seconds
-			setTimeout(() => {
-				setJob(prev =>
-					prev
-						? {
-								...prev,
-								export_status: null,
-								export: {
-									...prev.export,
-									[exportType]: `gs://bucket/models/${exportType}_${prev.job_id}`,
-								},
-							}
-						: null,
-				);
-				toast.success(`${exportType} export completed`);
-			}, 5000);
+			// Fetch updated job status after successful export completion
+			await fetchJobStatus();
+			toast.success(`${exportType.toUpperCase()} export completed`);
 		} catch (err: unknown) {
-			toast.error(`Failed to start ${exportType} export`);
+			toast.error(`Failed to export ${exportType.toUpperCase()}`);
 		} finally {
-			setExportLoading(null);
+			setIsWaitingForResponse(false);
+			setCurrentlyProcessingType(null);
 		}
 	};
 
@@ -156,7 +154,7 @@ export default function ExportJobDetailPage() {
 	) => {
 		// Simulate download
 		window.open(path, "_blank");
-		toast.success(`${exportType} download started`);
+		toast.success(`${exportType.toUpperCase()} download started`);
 	};
 
 	if (loading) {
@@ -179,8 +177,13 @@ export default function ExportJobDetailPage() {
 	}
 
 	const ModalityIcon = job.modality === "vision" ? ImageIcon : FileTextIcon;
-	const isExporting = !!job.export_status;
-	const isProcessing = isExporting || !!exportLoading;
+	const hasExportStatus = !!job.export_status;
+
+	// Determine UI states based on scenarios
+	const shouldShowRefresh = hasExportStatus; // Show refresh button ONLY when export is already running (from page load)
+	const shouldDisableRefresh =
+		refreshing || isWaitingForResponse || isPolling; // Disable refresh during manual refresh, export API calls, or polling
+	const shouldDisableExportButtons = hasExportStatus || isWaitingForResponse; // Disable export buttons when export running or export in progress
 
 	return (
 		<div className="max-w-4xl mx-auto py-8 space-y-6">
@@ -194,21 +197,25 @@ export default function ExportJobDetailPage() {
 						Manage and download your model exports
 					</p>
 				</div>
-				{isProcessing && (
+				{shouldShowRefresh && (
 					<Button
 						variant="outline"
 						size="sm"
 						onClick={() => fetchJobStatus(true)}
-						disabled={refreshing || isExporting}
+						disabled={shouldDisableRefresh}
 						className="flex items-center gap-2"
 					>
 						<RefreshCw
 							className={cn(
 								"w-4 h-4",
-								(refreshing || isExporting) && "animate-spin",
+								shouldDisableRefresh && "animate-spin",
 							)}
 						/>
-						{refreshing ? "Refreshing..." : "Refresh"}
+						{refreshing
+							? "Refreshing..."
+							: isPolling
+								? "Auto-refreshing..."
+								: "Refresh"}
 					</Button>
 				)}
 			</div>
@@ -240,6 +247,43 @@ export default function ExportJobDetailPage() {
 					</div>
 				</CardContent>
 			</Card>
+
+			{/* Status Banner */}
+			<div
+				className={cn(
+					"p-4 rounded-lg border-2",
+					hasExportStatus || isWaitingForResponse
+						? "border-blue-300"
+						: "border-emerald-300",
+				)}
+			>
+				<div className="flex items-center gap-3">
+					<div
+						className={cn(
+							"w-3 h-3 rounded-full",
+							hasExportStatus || isWaitingForResponse
+								? "bg-blue-500 animate-pulse"
+								: "bg-emerald-500",
+						)}
+					/>
+					<div>
+						<p className="font-medium">
+							{isWaitingForResponse
+								? `Processing ${currentlyProcessingType} export...`
+								: hasExportStatus
+									? `Processing ${job.export_status} export...`
+									: "Ready for export"}
+						</p>
+						<p className="text-sm text-muted-foreground">
+							{isWaitingForResponse
+								? "Please wait while your export is being processed"
+								: hasExportStatus
+									? "Export in progress, page will auto-refresh every 10 seconds"
+									: "All export types are available"}
+						</p>
+					</div>
+				</div>
+			</div>
 
 			{/* Export Types */}
 			<Card>
@@ -292,15 +336,18 @@ export default function ExportJobDetailPage() {
 									onClick={() =>
 										handleExportRequest("adapter")
 									}
-									disabled={isProcessing}
+									disabled={shouldDisableExportButtons}
 									className="w-full"
 									size="sm"
 									variant="outline"
 								>
-									{exportLoading === "adapter" ? (
+									{(isWaitingForResponse &&
+										currentlyProcessingType ===
+											"adapter") ||
+									job.export_status === "adapter" ? (
 										<>
 											<Loader2 className="animate-spin" />
-											Creating...
+											Processing...
 										</>
 									) : (
 										"Create Export"
@@ -350,15 +397,17 @@ export default function ExportJobDetailPage() {
 									onClick={() =>
 										handleExportRequest("merged")
 									}
-									disabled={isProcessing}
+									disabled={shouldDisableExportButtons}
 									className="w-full"
 									size="sm"
 									variant="outline"
 								>
-									{exportLoading === "merged" ? (
+									{(isWaitingForResponse &&
+										currentlyProcessingType === "merged") ||
+									job.export_status === "merged" ? (
 										<>
 											<Loader2 className="animate-spin" />
-											Creating...
+											Processing...
 										</>
 									) : (
 										"Create Export"
@@ -406,15 +455,17 @@ export default function ExportJobDetailPage() {
 							) : (
 								<Button
 									onClick={() => handleExportRequest("gguf")}
-									disabled={isProcessing}
+									disabled={shouldDisableExportButtons}
 									className="w-full"
 									size="sm"
 									variant="outline"
 								>
-									{exportLoading === "gguf" ? (
+									{(isWaitingForResponse &&
+										currentlyProcessingType === "gguf") ||
+									job.export_status === "gguf" ? (
 										<>
 											<Loader2 className="animate-spin" />
-											Creating...
+											Processing...
 										</>
 									) : (
 										"Create Export"
