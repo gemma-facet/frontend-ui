@@ -3,7 +3,6 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { mockExportJobs } from "@/data/mock-export-jobs";
 import { cn } from "@/lib/utils";
 import type { ExportJob } from "@/types/export";
 import {
@@ -30,16 +29,36 @@ export default function ExportJobDetailPage() {
 	const cancelled = useRef(false);
 	const polling = useRef<NodeJS.Timeout | null>(null);
 
-	// Find the job from mock data
+	// Fetch job data
 	useEffect(() => {
-		const foundJob = mockExportJobs.find(j => j.job_id === jobId);
-		if (foundJob) {
-			setJob(foundJob);
-			setLoading(false);
-		} else {
-			setError("Export job not found");
-			setLoading(false);
-		}
+		const fetchJob = async () => {
+			setLoading(true);
+			setError(null);
+
+			try {
+				const response = await fetch("/api/export/jobs");
+				if (!response.ok) {
+					throw new Error("Failed to fetch export jobs");
+				}
+
+				const data = await response.json();
+				const foundJob = data.jobs.find(
+					(j: ExportJob) => j.job_id === jobId,
+				);
+
+				if (foundJob) {
+					setJob(foundJob);
+				} else {
+					setError("Export job not found");
+				}
+			} catch (err: unknown) {
+				setError(err instanceof Error ? err.message : "Unknown error");
+			} finally {
+				setLoading(false);
+			}
+		};
+
+		fetchJob();
 	}, [jobId]);
 
 	const fetchJobStatus = useCallback(
@@ -49,11 +68,16 @@ export default function ExportJobDetailPage() {
 			setError(null);
 
 			try {
-				// Simulate API call
-				await new Promise(resolve => setTimeout(resolve, 1000));
+				const response = await fetch("/api/export/jobs");
+				if (!response.ok) {
+					throw new Error("Failed to fetch export jobs");
+				}
 
-				// Find job in mock data
-				const foundJob = mockExportJobs.find(j => j.job_id === jobId);
+				const data = await response.json();
+				const foundJob = data.jobs.find(
+					(j: ExportJob) => j.job_id === jobId,
+				);
+
 				if (foundJob) {
 					setJob(foundJob);
 

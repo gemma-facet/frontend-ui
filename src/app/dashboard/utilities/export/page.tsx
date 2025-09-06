@@ -2,24 +2,33 @@
 
 import ExportJobCard from "@/components/export-job-card";
 import { Button } from "@/components/ui/button";
-import { mockExportJobs } from "@/data/mock-export-jobs";
 import { cn } from "@/lib/utils";
+import type { ExportJob, ExportJobsResponse } from "@/types/export";
 import { Loader2, RefreshCcw } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
 const ExportPage = () => {
+	const [jobs, setJobs] = useState<ExportJob[]>([]);
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
-
-	// For now, using mock data
-	const jobs = mockExportJobs;
 
 	const refresh = useCallback(async () => {
 		setLoading(true);
 		setError(null);
-		// Simulate API call
-		await new Promise(resolve => setTimeout(resolve, 1000));
-		setLoading(false);
+
+		try {
+			const response = await fetch("/api/export/jobs");
+			if (!response.ok) {
+				throw new Error("Failed to fetch export jobs");
+			}
+
+			const data: ExportJobsResponse = await response.json();
+			setJobs(data.jobs);
+		} catch (err: unknown) {
+			setError(err instanceof Error ? err.message : "Unknown error");
+		} finally {
+			setLoading(false);
+		}
 	}, []);
 
 	// Refresh on page visit

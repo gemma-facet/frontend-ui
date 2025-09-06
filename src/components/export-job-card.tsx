@@ -23,7 +23,7 @@ export default function ExportJobCard({ job }: ExportJobCardProps) {
 		if (!job.export_status)
 			return { text: "Ready to export", color: "text-emerald-600" };
 
-		const statusConfig = {
+		const statusConfig: Record<string, { text: string; color: string }> = {
 			adapter: { text: "Exporting adapter...", color: "text-amber-600" },
 			merged: {
 				text: "Exporting merged model...",
@@ -32,7 +32,12 @@ export default function ExportJobCard({ job }: ExportJobCardProps) {
 			gguf: { text: "Exporting GGUF...", color: "text-amber-600" },
 		};
 
-		return statusConfig[job.export_status];
+		return (
+			statusConfig[job.export_status] || {
+				text: "Exporting...",
+				color: "text-amber-600",
+			}
+		);
 	};
 
 	const getExportTypes = () => {
