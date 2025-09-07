@@ -798,6 +798,10 @@ export default function TrainingConfigPage() {
 											value: "merged",
 											label: "Merged Model",
 										},
+										{
+											value: "full",
+											label: "Full Fine Tuning",
+										},
 									],
 								})}
 								{ExportSelectInput({

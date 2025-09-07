@@ -139,7 +139,7 @@ export interface WandbConfig {
 }
 
 export interface ExportConfig {
-	format: "adapter" | "merged";
+	format: "adapter" | "merged" | "full";
 	destination: "gcs" | "hfhub";
 	hf_repo_id?: string;
 	include_gguf?: boolean;
