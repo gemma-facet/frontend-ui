@@ -1,6 +1,6 @@
 "use client";
 
-import { jobCacheAtom } from "@/atoms";
+import { selectedModelAtom } from "@/atoms";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import {
@@ -10,46 +10,29 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import {
-	Sheet,
-	SheetClose,
-	SheetContent,
-	SheetDescription,
-	SheetFooter,
-	SheetHeader,
-	SheetTitle,
-	SheetTrigger,
-} from "@/components/ui/sheet";
 import {
 	Tooltip,
 	TooltipContent,
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
-import type { InferenceResponse } from "@/types/inference";
 import type { JobDeleteResponse, TrainingJob } from "@/types/training";
-import { useAtomValue, useSetAtom } from "jotai";
+import { useSetAtom } from "jotai";
 import { Download, InfoIcon, Loader2, RefreshCw, Trash2 } from "lucide-react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 export default function JobDetailPage() {
-	const { jobId } = useParams<{ jobId: string }>();
-	const cache = useAtomValue(jobCacheAtom);
-	const [job, setJob] = useState<TrainingJob | null>(
-		cache[jobId as string] ?? null,
-	);
+	const params = useParams();
+	const router = useRouter();
+	const jobId = params.jobId as string;
+
+	const [job, setJob] = useState<TrainingJob | null>(null);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 	const [refreshing, setRefreshing] = useState(false);
-	const [inferenceOpen, setInferenceOpen] = useState(false);
-	const [prompt, setPrompt] = useState("");
-	const [inferenceResult, setInferenceResult] = useState<string | null>(null);
-	const [inferenceLoading, setInferenceLoading] = useState(false);
-	const [inferenceError, setInferenceError] = useState<string | null>(null);
-	const [hfToken, setHfToken] = useState<string>("");
+	const setSelectedModel = useSetAtom(selectedModelAtom);
 	const [downloadLoading, setDownloadLoading] = useState(false);
 	const [downloadError, setDownloadError] = useState<string | null>(null);
 	const [deleteLoading, setDeleteLoading] = useState(false);
@@ -57,7 +40,7 @@ export default function JobDetailPage() {
 	const [deleteSuccess, setDeleteSuccess] =
 		useState<JobDeleteResponse | null>(null);
 	const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-	const setJobCache = useSetAtom(jobCacheAtom);
+	const [hfToken, setHfToken] = useState<string>("");
 
 	const cancelled = useRef(false);
 	const polling = useRef<NodeJS.Timeout | null>(null);
@@ -88,7 +71,6 @@ export default function JobDetailPage() {
 				const data = await res.json();
 				if (res.ok) {
 					setJob(data);
-					setJobCache(prev => ({ ...prev, [jobId as string]: data }));
 					if (
 						!manual &&
 						!cancelled.current &&
@@ -107,7 +89,7 @@ export default function JobDetailPage() {
 				if (manual) setRefreshing(false);
 			}
 		},
-		[jobId, setJobCache],
+		[jobId],
 	);
 
 	useEffect(() => {
@@ -128,39 +110,6 @@ export default function JobDetailPage() {
 			}
 		}
 	}, [job]);
-
-	async function handleInference() {
-		setInferenceLoading(true);
-		setInferenceError(null);
-		setInferenceResult(null);
-		try {
-			// Validate HF token for HuggingFace models
-			if (provider === "huggingface" && !hfToken) {
-				toast.error(
-					"HuggingFace token is required for HuggingFace models",
-				);
-				return;
-			}
-
-			const res = await fetch("/api/inference", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({
-					adapter_path: job?.adapter_path,
-					base_model_id: job?.base_model_id,
-					prompt,
-					hf_token: hfToken,
-				}),
-			});
-			const data = (await res.json()) as InferenceResponse;
-			if (!res.ok) throw new Error("Inference failed");
-			setInferenceResult(data.result);
-		} catch (err: unknown) {
-			setInferenceError(err instanceof Error ? err.message : String(err));
-		} finally {
-			setInferenceLoading(false);
-		}
-	}
 
 	async function handleDownload() {
 		if (!job?.gguf_path) return;
@@ -281,126 +230,17 @@ export default function JobDetailPage() {
 						{deleteLoading ? "Deleting..." : "Delete Job"}
 					</Button>
 					{job.status === "completed" && job.adapter_path && (
-						<Sheet
-							open={inferenceOpen}
-							onOpenChange={setInferenceOpen}
+						<Button
+							variant="default"
+							size="sm"
+							onClick={() => {
+								setSelectedModel({ type: "trained", job });
+								router.push("/dashboard/utilities/evaluation");
+							}}
+							className="flex items-center gap-2"
 						>
-							<SheetTrigger asChild>
-								<Button
-									variant="outline"
-									size="sm"
-									className="flex items-center gap-2"
-								>
-									Try Inference
-								</Button>
-							</SheetTrigger>
-							<SheetContent side="right" className="w-96">
-								<SheetHeader>
-									<SheetTitle>Try Inference</SheetTitle>
-									<SheetDescription>
-										Test your trained model with a custom
-										prompt
-									</SheetDescription>
-								</SheetHeader>
-								<div className="flex flex-col gap-4 mt-6">
-									{provider === "huggingface" && (
-										<div className="space-y-2">
-											<label
-												htmlFor="hfToken"
-												className="text-sm font-medium"
-											>
-												HuggingFace Token{" "}
-												<Tooltip>
-													<TooltipTrigger>
-														<InfoIcon size={18} />
-													</TooltipTrigger>
-													<TooltipContent className="w-xs text-center">
-														You can set this token
-														in the{" "}
-														<Link
-															href="/dashboard/profile"
-															className="underline hover:no-underline"
-														>
-															Profile
-														</Link>{" "}
-														page so it's saved in
-														your browser for
-														autofill or manually
-														enter it here.
-													</TooltipContent>
-												</Tooltip>
-											</label>
-											<Input
-												id="hfToken"
-												type="password"
-												value={hfToken}
-												onChange={e =>
-													setHfToken(e.target.value)
-												}
-												placeholder="Enter your HuggingFace token..."
-												disabled={inferenceLoading}
-											/>
-										</div>
-									)}
-									<div className="space-y-2">
-										<label
-											htmlFor="prompt"
-											className="text-sm font-medium"
-										>
-											Prompt
-										</label>
-										<Input
-											id="prompt"
-											value={prompt}
-											onChange={e =>
-												setPrompt(e.target.value)
-											}
-											placeholder="Enter your prompt here..."
-											disabled={inferenceLoading}
-										/>
-									</div>
-									<Button
-										onClick={handleInference}
-										disabled={
-											!prompt.trim() ||
-											inferenceLoading ||
-											(provider === "huggingface" &&
-												!hfToken.trim())
-										}
-										className="w-full"
-									>
-										{inferenceLoading ? (
-											<>
-												<Loader2 className="animate-spin w-4 h-4 mr-2" />
-												Running...
-											</>
-										) : (
-											"Run Inference"
-										)}
-									</Button>
-									{inferenceError && (
-										<div className="text-red-600 text-sm p-3 bg-red-50 rounded border">
-											{inferenceError}
-										</div>
-									)}
-									{inferenceResult && (
-										<div className="space-y-2">
-											<span className="text-sm font-medium">
-												Result:
-											</span>
-											<div className="bg-muted p-3 rounded text-sm whitespace-pre-wrap max-h-60 overflow-auto border">
-												{inferenceResult}
-											</div>
-										</div>
-									)}
-								</div>
-								<SheetFooter className="mt-6">
-									<SheetClose asChild>
-										<Button variant="outline">Close</Button>
-									</SheetClose>
-								</SheetFooter>
-							</SheetContent>
-						</Sheet>
+							Evaluate Model
+						</Button>
 					)}
 				</div>
 			</div>
@@ -675,40 +515,6 @@ export default function JobDetailPage() {
 										</div>
 									</div>
 								)}
-						</div>
-					</CardContent>
-				</Card>
-			)}
-
-			{/* Actions */}
-			{job.status === "completed" && job.adapter_path && (
-				<Card>
-					<CardHeader>
-						<h3 className="text-lg font-semibold">
-							Available Actions
-						</h3>
-						<p className="text-sm text-muted-foreground">
-							What you can do with your trained model
-						</p>
-					</CardHeader>
-					<CardContent>
-						<div className="flex gap-3">
-							<Link
-								href={`/dashboard/training/${jobId}/batch`}
-								className="flex-1"
-							>
-								<Button variant="outline" className="w-full">
-									Batch Inference
-								</Button>
-							</Link>
-							<Link
-								href={`/dashboard/training/${jobId}/evaluation`}
-								className="flex-1"
-							>
-								<Button variant="outline" className="w-full">
-									Evaluate Model
-								</Button>
-							</Link>
 						</div>
 					</CardContent>
 				</Card>

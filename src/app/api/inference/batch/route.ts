@@ -8,26 +8,25 @@ import { backendFetch } from "../../utils";
 
 export async function POST(request: Request) {
 	try {
-		const body = await request.json();
-		const { adapter_path, base_model_id, messages, hf_token } =
-			body as Partial<BatchInferenceRequest>;
+		const body = (await request.json()) as BatchInferenceRequest;
 
 		if (
-			!adapter_path ||
-			!base_model_id ||
-			!Array.isArray(messages) ||
-			messages.length === 0
+			!body.model_source ||
+			!body.model_type ||
+			!body.base_model_id ||
+			!Array.isArray(body.messages) ||
+			body.messages.length === 0
 		) {
 			return NextResponse.json(
 				{
-					error: "adapter_path, base_model_id, and messages (array) are required",
+					error: "model_source, model_type, base_model_id, and a non-empty messages array are required",
 				},
 				{ status: 400 },
 			);
 		}
 
-		const provider = base_model_id.split("/")[0];
-		if (provider === "huggingface" && !hf_token) {
+		const provider = body.base_model_id.split("/")[0];
+		if (provider === "huggingface" && !body.hf_token) {
 			return NextResponse.json(
 				{ error: "hf_token is required for Hugging Face models" },
 				{ status: 400 },
@@ -40,18 +39,20 @@ export async function POST(request: Request) {
 			{
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({
-					hf_token,
-					adapter_path,
-					base_model_id,
-					messages,
-				}),
+				body: JSON.stringify(body),
 			},
 		);
 
-		const data = await res.json();
-		if (!res.ok) throw new Error(data.error || "Batch inference failed");
-		return NextResponse.json(data as BatchInferenceResponse);
+		if (!res.ok) {
+			const errorText = await res.text();
+			return Response.json(
+				{ error: `Batch inference service error: ${errorText}` },
+				{ status: res.status },
+			);
+		}
+
+		const data = (await res.json()) as BatchInferenceResponse;
+		return NextResponse.json(data);
 	} catch (err: unknown) {
 		return NextResponse.json(
 			{ error: err instanceof Error ? err.message : String(err) },

@@ -64,8 +64,9 @@ export default function TrainingConfigPage() {
 		}
 	}, [model, datasetId, router]);
 
-	if (!config) {
-		if (model && datasetId) {
+	// Initialize config and tokens
+	useEffect(() => {
+		if (!config && model && datasetId) {
 			// Get stored tokens
 			let storedWbToken = "";
 			let storedHfToken = "";
@@ -134,6 +135,9 @@ export default function TrainingConfigPage() {
 				setHfToken(storedHfToken);
 			}
 		}
+	}, [config, model, datasetId, modality, setConfig, setHfToken]);
+
+	if (!config) {
 		return null;
 	}
 
@@ -239,9 +243,9 @@ export default function TrainingConfigPage() {
 	};
 
 	const handleHfTokenChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-		setConfig(prev =>
-			prev ? { ...prev, hf_token: e.target.value } : null,
-		);
+		const value = e.target.value;
+		setHfToken(value); // Update the atom
+		setConfig(prev => (prev ? { ...prev, hf_token: value } : null));
 	};
 
 	const handleNext = () => {

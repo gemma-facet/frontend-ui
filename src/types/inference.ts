@@ -1,30 +1,33 @@
 import type { DatasetMessage } from "./dataset";
 
-// Single inference request/response
+export type ModelType = "adapter" | "merged" | "base";
+
 export interface InferenceRequest {
-	adapter_path: string;
+	hf_token: string;
+	model_source: string;
+	model_type: ModelType;
 	base_model_id: string;
 	prompt: string;
-	hf_token: string;
+	use_vllm?: boolean;
 }
 
 export interface InferenceResponse {
 	result: string;
 }
 
-// Batch inference request/response
 export interface BatchInferenceRequest {
-	adapter_path: string;
-	base_model_id: string;
-	messages: Array<Array<DatasetMessage>>;
 	hf_token: string;
+	model_source: string;
+	model_type: ModelType;
+	base_model_id: string;
+	messages: DatasetMessage[][]; // Array of conversations, where each conversation is a list of messages
+	use_vllm?: boolean;
 }
 
 export interface BatchInferenceResponse {
 	results: string[];
 }
 
-// Evaluation request/response (moved from training types)
 export type TaskType =
 	| "conversation"
 	| "qa"
@@ -45,14 +48,16 @@ export type MetricType =
 	| "f1";
 
 export interface EvaluationRequest {
-	adapter_path: string;
+	hf_token: string;
+	model_source: string;
+	model_type: ModelType;
 	base_model_id: string;
 	dataset_id: string;
 	task_type?: TaskType;
 	metrics?: MetricType[];
 	max_samples?: number;
 	num_sample_results?: number;
-	hf_token: string;
+	use_vllm?: boolean;
 }
 
 export interface SampleResult {

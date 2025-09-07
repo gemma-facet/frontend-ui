@@ -159,6 +159,7 @@ export const datasetProcessingLoadingAtom = atom(false);
 export type TrainingModelType = {
 	modelId: string;
 	provider: "unsloth" | "huggingface";
+	trainingType: "it" | "pt";
 };
 export const trainingModelAtom = atom<TrainingModelType | null>(null);
 export const trainingDatasetIdAtom = atom<string>("");
@@ -180,3 +181,35 @@ export const jobsAtom = atom<TrainingJobsState>({
 /* ********** Job Cache Atom ********** */
 export const jobCacheAtom = atom<Record<string, TrainingJob>>({});
 /* ********** Job Cache Atom ********** */
+
+/* ********** Evaluation Atoms ********** */
+
+export type EvaluationMode = "metrics" | "batch_inference";
+export const evaluationModeAtom = atom<EvaluationMode | null>(null);
+
+export type SelectedModel = {
+	type: "base" | "trained";
+	baseModelId?: string; // Store the original base model ID (e.g., "gemma-3-1b")
+	useUnsloth?: boolean; // Whether Unsloth provider is used
+	useQuantization?: boolean; // Whether quantization is enabled
+	usePreTrained?: boolean; // Whether to use -pt instead of -it models
+	job?: TrainingJob; // For trained models
+};
+
+export const selectedModelAtom = atom<SelectedModel | null>(null);
+
+export type ComparisonModels = {
+	isComparison: boolean;
+	model1: SelectedModel | null;
+	model2: SelectedModel | null;
+};
+
+export const comparisonModelsAtom = atom<ComparisonModels>({
+	isComparison: false,
+	model1: null,
+	model2: null,
+});
+
+export const useVllmAtom = atom<boolean>(false);
+
+/* ********** Evaluation Atoms ********** */

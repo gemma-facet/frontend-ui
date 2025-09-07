@@ -5,48 +5,60 @@ import { backendFetch } from "../utils";
 
 export async function POST(request: Request) {
 	try {
-		const body = await request.json();
-		const { adapter_path, base_model_id, prompt, hf_token } =
-			body as Partial<InferenceRequest>;
+		const body = (await request.json()) as InferenceRequest;
 
-		if (!adapter_path || !base_model_id || !prompt) {
-			return NextResponse.json(
+		// Validate required fields
+		if (
+			!body.model_source ||
+			!body.model_type ||
+			!body.base_model_id ||
+			!body.prompt
+		) {
+			return Response.json(
 				{
-					error: "adapter_path, base_model_id, and prompt are required",
+					error: "model_source, model_type, base_model_id, and prompt are required",
 				},
 				{ status: 400 },
 			);
 		}
 
-		const provider = base_model_id.split("/")[0];
-		if (provider === "huggingface" && !hf_token) {
-			return NextResponse.json(
+		const baseModelParts = body.base_model_id.split("/");
+		const provider =
+			baseModelParts[0] === "unsloth" ? "unsloth" : "huggingface";
+
+		if (provider === "huggingface" && !body.hf_token) {
+			return Response.json(
 				{ error: "hf_token is required for Hugging Face models" },
 				{ status: 400 },
 			);
 		}
 
-		const res = await backendFetch(
+		const response = await backendFetch(
 			request,
 			`${INFERENCE_SERVICE_URL}/inference`,
 			{
 				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({
-					hf_token,
-					adapter_path,
-					base_model_id,
-					prompt,
-				}),
+				headers: {
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify(body),
 			},
 		);
 
-		const data = await res.json();
-		if (!res.ok) throw new Error(data.error || "Inference failed");
-		return NextResponse.json(data as InferenceResponse);
-	} catch (err: unknown) {
-		return NextResponse.json(
-			{ error: err instanceof Error ? err.message : String(err) },
+		if (!response.ok) {
+			const errorText = await response.text();
+			return Response.json(
+				{ error: `Inference service error: ${errorText}` },
+				{ status: response.status },
+			);
+		}
+
+		const result = (await response.json()) as InferenceResponse;
+		return Response.json(result);
+	} catch (error) {
+		console.error("Inference error:", error);
+		return Response.json(
+			{ error: "Internal server error" },
 			{ status: 500 },
 		);
 	}

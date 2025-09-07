@@ -7,10 +7,15 @@ export async function POST(request: Request) {
 		const body = (await request.json()) as EvaluationRequest;
 
 		// Validate required fields
-		if (!body.adapter_path || !body.base_model_id || !body.dataset_id) {
+		if (
+			!body.model_source ||
+			!body.model_type ||
+			!body.base_model_id ||
+			!body.dataset_id
+		) {
 			return Response.json(
 				{
-					error: "adapter_path, base_model_id, and dataset_id are required",
+					error: "model_source, model_type, base_model_id, and dataset_id are required",
 				},
 				{ status: 400 },
 			);
@@ -35,9 +40,11 @@ export async function POST(request: Request) {
 			);
 		}
 
-		if (!body.task_type && !body.metrics) {
+		if (!body.task_type && (!body.metrics || body.metrics.length === 0)) {
 			return Response.json(
-				{ error: "Either task_type or metrics must be specified" },
+				{
+					error: "Either task_type or a non-empty list of metrics must be specified",
+				},
 				{ status: 400 },
 			);
 		}
@@ -50,16 +57,7 @@ export async function POST(request: Request) {
 				headers: {
 					"Content-Type": "application/json",
 				},
-				body: JSON.stringify({
-					hf_token: body.hf_token,
-					adapter_path: body.adapter_path,
-					base_model_id: body.base_model_id,
-					dataset_id: body.dataset_id,
-					...(body.task_type && { task_type: body.task_type }),
-					...(body.metrics && { metrics: body.metrics }),
-					...(body.max_samples && { max_samples: body.max_samples }),
-					num_sample_results: body.num_sample_results || 3,
-				}),
+				body: JSON.stringify(body),
 			},
 		);
 

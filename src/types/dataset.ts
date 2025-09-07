@@ -36,13 +36,18 @@ export interface DatasetMessage {
 }
 
 export interface DatasetSample {
+	// Conversation format (existing)
 	messages?: DatasetMessage[];
-	// For prompt-only mode
+
+	// Prompt-only format (inference only, no ground truth)
 	prompt?: DatasetMessage[];
-	// For preference mode
+
+	// Preference format
 	chosen?: DatasetMessage[];
 	rejected?: DatasetMessage[];
-	[key: string]: unknown; // Additional dynamic fields based on user field mappings (strings only)
+
+	// Additional dynamic fields based on user field mappings
+	[key: string]: unknown;
 }
 export interface DatasetSplit {
 	split_name: string;
