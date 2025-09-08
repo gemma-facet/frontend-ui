@@ -94,8 +94,8 @@ export default function TrainingConfigPage() {
 					epochs: 3,
 					max_steps: -1,
 					packing: false,
+					padding_free: false,
 					use_fa2: false,
-					max_seq_length: 2048,
 					lr_scheduler_type: "linear",
 					save_strategy: "epoch",
 					logging_steps: 10,
@@ -577,6 +577,10 @@ export default function TrainingConfigPage() {
 											value: "grpo",
 											label: "GRPO Trainer",
 										},
+										{
+											value: "orpo",
+											label: "ORPO Trainer",
+										},
 									],
 								})}
 								{CoreSelectInput({
@@ -675,20 +679,17 @@ export default function TrainingConfigPage() {
 								</AccordionContent>
 							</AccordionItem>
 						)}
-						{config.trainer_type === "dpo" && (
+						{(config.trainer_type === "dpo" ||
+							config.trainer_type === "orpo") && (
 							<AccordionItem value="dpo">
 								<AccordionTrigger>
-									DPO Settings
+									DPO/ORPO Settings
 								</AccordionTrigger>
 								<AccordionContent className="grid md:grid-cols-2 gap-4 py-4">
 									{HyperparameterNumberInput({
 										field: "beta",
-										label: "DPO Beta (Regularization)",
+										label: "DPO/ORPO Beta (Regularization)",
 										step: 0.01,
-									})}
-									{HyperparameterNumberInput({
-										field: "max_length",
-										label: "Max Length",
 									})}
 								</AccordionContent>
 							</AccordionItem>
@@ -733,8 +734,8 @@ export default function TrainingConfigPage() {
 							</AccordionTrigger>
 							<AccordionContent className="grid md:grid-cols-2 gap-4 py-4">
 								{HyperparameterNumberInput({
-									field: "max_seq_length",
-									label: "Max Sequence Length",
+									field: "max_length",
+									label: "Max Length (for truncation)",
 								})}
 								{HyperparameterSelectInput({
 									field: "lr_scheduler_type",
@@ -774,6 +775,10 @@ export default function TrainingConfigPage() {
 								{HyperparameterCheckboxInput({
 									field: "packing",
 									label: "Enable Sequence Packing",
+								})}
+								{HyperparameterCheckboxInput({
+									field: "padding_free",
+									label: "Use padding free (requires FA2)",
 								})}
 								{HyperparameterCheckboxInput({
 									field: "use_fa2",
