@@ -11,6 +11,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import type { UserFieldMapping } from "@/types/dataset";
 import { PlusIcon, TrashIcon } from "lucide-react";
+import { useEffect, useState } from "react";
+
+// small helper to create a stable-ish id for keys
+const generateId = () =>
+	`${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`;
 
 interface UserFieldMappingProps {
 	columns: string[];
@@ -29,13 +34,42 @@ const UserFieldMappingComponent = ({
 		col => !excludeColumns.includes(col),
 	);
 
+	// generate a reasonably unique id for each content part and keep them
+	// internal to the component so keys remain stable across value changes.
+	const [keys, setKeys] = useState<string[]>(() =>
+		value.map(() => generateId()),
+	);
+
+	// keep keys in sync with the controlled `value` prop length. Use the
+	// functional updater to avoid reading `keys` from the outer scope so the
+	// effect only needs to depend on `value.length` (satisfies exhaustive-deps).
+	useEffect(() => {
+		setKeys(prev => {
+			if (value.length > prev.length) {
+				return [
+					...prev,
+					...Array(value.length - prev.length)
+						.fill(0)
+						.map(() => generateId()),
+				];
+			}
+			if (value.length < prev.length) {
+				return prev.slice(0, value.length);
+			}
+			return prev;
+		});
+	}, [value.length]);
+
 	const handleAddField = () => {
 		onChange([...value, { type: "template", value: "" }]);
+		// optimistically add a key so new item mounts with stable key
+		setKeys(prev => [...prev, generateId()]);
 	};
 
 	const handleRemoveField = (index: number) => {
 		const newValue = value.filter((_, i) => i !== index);
 		onChange(newValue);
+		setKeys(prev => prev.filter((_, i) => i !== index));
 	};
 
 	const handleFieldChange = (index: number, field: UserFieldMapping) => {
@@ -61,7 +95,7 @@ const UserFieldMappingComponent = ({
 		<div className="space-y-4">
 			{value.map((field, index) => (
 				<div
-					key={`field-${index}-${field.type}-${field.value}`}
+					key={keys[index]}
 					className="flex flex-col gap-3 p-3 border rounded-lg"
 				>
 					<div className="flex items-center justify-between">
@@ -122,11 +156,20 @@ const UserFieldMappingComponent = ({
 									<SelectValue placeholder="Select a column" />
 								</SelectTrigger>
 								<SelectContent>
-									{availableColumns.map(column => (
-										<SelectItem key={column} value={column}>
-											{column}
-										</SelectItem>
-									))}
+									{columns
+										.filter(
+											col =>
+												!excludeColumns.includes(col) ||
+												col === field.value,
+										)
+										.map(column => (
+											<SelectItem
+												key={column}
+												value={column}
+											>
+												{column}
+											</SelectItem>
+										))}
 								</SelectContent>
 							</Select>
 						</TabsContent>
@@ -145,11 +188,20 @@ const UserFieldMappingComponent = ({
 									<SelectValue placeholder="Select an image column" />
 								</SelectTrigger>
 								<SelectContent>
-									{availableColumns.map(column => (
-										<SelectItem key={column} value={column}>
-											{column}
-										</SelectItem>
-									))}
+									{columns
+										.filter(
+											col =>
+												!excludeColumns.includes(col) ||
+												col === field.value,
+										)
+										.map(column => (
+											<SelectItem
+												key={column}
+												value={column}
+											>
+												{column}
+											</SelectItem>
+										))}
 								</SelectContent>
 							</Select>
 						</TabsContent>
