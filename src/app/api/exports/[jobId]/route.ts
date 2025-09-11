@@ -1,7 +1,7 @@
-import type { ExportJob } from "@/types/export";
+import type { GetExportResponse } from "@/types/export";
 import { NextResponse } from "next/server";
-import { EXPORT_SERVICE_URL } from "../../../env";
-import { backendFetch } from "../../../utils";
+import { EXPORT_SERVICE_URL } from "../../env";
+import { backendFetch } from "../../utils";
 
 export async function GET(
 	request: Request,
@@ -12,7 +12,7 @@ export async function GET(
 
 		const res = await backendFetch(
 			request,
-			`${EXPORT_SERVICE_URL}/jobs/${jobId}`,
+			`${EXPORT_SERVICE_URL}/exports/${jobId}`,
 			{
 				method: "GET",
 				headers: { "Content-Type": "application/json" },
@@ -22,7 +22,7 @@ export async function GET(
 		const data = await res.json();
 		if (!res.ok)
 			throw new Error(data.error || "Failed to fetch export job");
-		return NextResponse.json(data as ExportJob);
+		return NextResponse.json(data as GetExportResponse);
 	} catch (err: unknown) {
 		return NextResponse.json(
 			{ error: err instanceof Error ? err.message : String(err) },

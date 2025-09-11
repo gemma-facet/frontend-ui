@@ -8,49 +8,28 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
-import type { ExportJob } from "@/types/export";
+import type { JobSchema } from "@/types/export";
 import { FileTextIcon, ImageIcon } from "lucide-react";
 import Link from "next/link";
 
 export type ExportJobCardProps = {
-	job: ExportJob;
+	job: JobSchema;
 };
 
 export default function ExportJobCard({ job }: ExportJobCardProps) {
 	const ModalityIcon = job.modality === "vision" ? ImageIcon : FileTextIcon;
 
-	const getExportStatus = () => {
-		if (!job.export_status)
-			return { text: "Ready to export", color: "text-emerald-600" };
-
-		const statusConfig: Record<string, { text: string; color: string }> = {
-			adapter: { text: "Exporting adapter...", color: "text-amber-600" },
-			merged: {
-				text: "Exporting merged model...",
-				color: "text-amber-600",
-			},
-			gguf: { text: "Exporting GGUF...", color: "text-amber-600" },
-		};
-
-		return (
-			statusConfig[job.export_status] || {
-				text: "Exporting...",
-				color: "text-amber-600",
-			}
-		);
-	};
-
 	const getExportTypes = () => {
+		const artifacts = job.artifacts?.file;
 		const exportTypes = [
-			{ type: "Adapter", available: !!job.export?.adapter },
-			{ type: "Merged", available: !!job.export?.merged },
-			{ type: "GGUF", available: !!job.export?.gguf },
+			{ type: "Adapter", available: !!artifacts?.adapter },
+			{ type: "Merged", available: !!artifacts?.merged },
+			{ type: "GGUF", available: !!artifacts?.gguf },
 		];
 
 		return exportTypes;
 	};
 
-	const exportStatus = getExportStatus();
 	const exportTypes = getExportTypes();
 
 	return (
@@ -58,17 +37,15 @@ export default function ExportJobCard({ job }: ExportJobCardProps) {
 			<Card className="hover:bg-muted/30 transition-colors duration-200 h-full">
 				<CardHeader className="pb-2">
 					<div className="flex items-start justify-between">
-						<div className="flex items-center gap-2 min-w-0 flex-1">
-							<ModalityIcon className="w-4 h-4 text-muted-foreground flex-shrink-0" />
-							<CardTitle className="text-lg truncate">
-								{job.job_name ?? job.job_id}
+						<div className="flex items-center gap-3 min-w-0 flex-1">
+							<CardTitle className="text-lg truncate text-wrap">
+								{job.job_id}
 							</CardTitle>
+							<ModalityIcon className="w-4 h-4 text-muted-foreground flex-shrink-0" />
 						</div>
 					</div>
-					<CardDescription
-						className={`text-sm font-medium ${exportStatus.color}`}
-					>
-						{exportStatus.text}
+					<CardDescription className="text-sm font-medium text-emerald-600">
+						Ready to export
 					</CardDescription>
 				</CardHeader>
 

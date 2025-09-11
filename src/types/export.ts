@@ -1,24 +1,55 @@
-export interface ExportPaths {
+// New schema types based on backend changes
+export type ExportType = "adapter" | "merged" | "gguf";
+export type ExportStatus = "running" | "completed" | "failed";
+export type ExportVariant = "raw" | "file";
+export type Modality = "text" | "vision";
+
+export interface JobArtifactsFiles {
 	adapter?: string;
 	merged?: string;
 	gguf?: string;
 }
 
-export interface ExportJob {
-	base_model_id: string;
-	created_at: string;
-	export: ExportPaths;
-	export_status: string | null;
+export interface JobArtifactsRaw {
+	adapter?: string;
+	merged?: string;
+}
+
+export interface JobArtifacts {
+	file: JobArtifactsFiles;
+	raw: JobArtifactsRaw;
+}
+
+export interface JobSchema {
 	job_id: string;
-	job_name: string;
-	modality: "text" | "vision";
+	user_id: string;
+	adapter_path: string;
+	base_model_id: string;
+	modality?: Modality;
+	artifacts?: JobArtifacts;
 }
 
-export interface ExportJobsResponse {
-	jobs: ExportJob[];
+export interface ExportArtifact {
+	type: ExportType;
+	path: string;
+	variant: ExportVariant;
 }
 
-export type ExportType = "adapter" | "merged" | "gguf";
+export interface ExportSchema {
+	export_id: string;
+	job_id: string;
+	type: ExportType;
+	status: ExportStatus;
+	message?: string;
+	artifacts: ExportArtifact[];
+	started_at: string;
+	finished_at?: string;
+	updated_at?: string;
+}
+
+export interface GetExportResponse extends JobSchema {
+	latest_export?: ExportSchema;
+}
 
 export interface ExportRequest {
 	job_id: string;

@@ -4,7 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import type { ExportJob } from "@/types/export";
+import type { GetExportResponse } from "@/types/export";
 import {
 	CheckCircleIcon,
 	ClockIcon,
@@ -12,7 +12,6 @@ import {
 	FileTextIcon,
 	ImageIcon,
 	Loader2,
-	RefreshCw,
 } from "lucide-react";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -20,17 +19,13 @@ import { toast } from "sonner";
 
 export default function ExportJobDetailPage() {
 	const { jobId } = useParams<{ jobId: string }>();
-	const [job, setJob] = useState<ExportJob | null>(null);
+	const [job, setJob] = useState<GetExportResponse | null>(null);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
-	const [refreshing, setRefreshing] = useState(false);
-	const [isWaitingForResponse, setIsWaitingForResponse] = useState(false);
-	const [currentlyProcessingType, setCurrentlyProcessingType] = useState<
+	const [exportingType, setExportingType] = useState<
 		"adapter" | "merged" | "gguf" | null
 	>(null);
-	const [isPolling, setIsPolling] = useState(false);
 
-	const cancelled = useRef(false);
 	const polling = useRef<NodeJS.Timeout | null>(null);
 
 	// Fetch job data
@@ -40,12 +35,12 @@ export default function ExportJobDetailPage() {
 			setError(null);
 
 			try {
-				const response = await fetch(`/api/export/jobs/${jobId}`);
+				const response = await fetch(`/api/exports/${jobId}`);
 				if (!response.ok) {
 					throw new Error("Failed to fetch export job");
 				}
 
-				const data: ExportJob = await response.json();
+				const data: GetExportResponse = await response.json();
 				setJob(data);
 			} catch (err: unknown) {
 				setError(err instanceof Error ? err.message : "Unknown error");
@@ -57,43 +52,29 @@ export default function ExportJobDetailPage() {
 		fetchJob();
 	}, [jobId]);
 
-	const fetchJobStatus = useCallback(
-		async (manual = false) => {
-			if (manual) {
-				setRefreshing(true);
-			} else {
-				setIsPolling(true);
+	const fetchJobStatus = useCallback(async () => {
+		try {
+			const response = await fetch(`/api/exports/${jobId}`);
+			if (!response.ok) {
+				throw new Error("Failed to fetch export job");
 			}
 
-			try {
-				const response = await fetch(`/api/export/jobs/${jobId}`);
-				if (!response.ok) {
-					throw new Error("Failed to fetch export job");
-				}
+			const data: GetExportResponse = await response.json();
+			setJob(data);
+			console.log(data);
 
-				const data: ExportJob = await response.json();
-				setJob(data);
-
-				// If export_status is not null and this is not a manual refresh, schedule next poll
-				if (data.export_status && !manual) {
-					polling.current = setTimeout(() => fetchJobStatus(), 10000);
-				}
-			} catch (err: unknown) {
-				setError(err instanceof Error ? err.message : String(err));
-			} finally {
-				if (manual) {
-					setRefreshing(false);
-				} else {
-					setIsPolling(false);
-				}
+			// If latest_export status is running, schedule next poll in 10 seconds
+			if (data.latest_export?.status === "running") {
+				polling.current = setTimeout(() => fetchJobStatus(), 10000);
 			}
-		},
-		[jobId],
-	);
+		} catch (err: unknown) {
+			setError(err instanceof Error ? err.message : String(err));
+		}
+	}, [jobId]);
 
-	// Start polling if export_status is not null
+	// Start polling if latest_export status is running
 	useEffect(() => {
-		if (job?.export_status && !cancelled.current) {
+		if (job?.latest_export?.status === "running") {
 			polling.current = setTimeout(() => fetchJobStatus(), 10000);
 		}
 
@@ -103,12 +84,11 @@ export default function ExportJobDetailPage() {
 				polling.current = null;
 			}
 		};
-	}, [job?.export_status, fetchJobStatus]);
+	}, [job?.latest_export?.status, fetchJobStatus]);
 
 	// Cleanup on unmount
 	useEffect(() => {
 		return () => {
-			cancelled.current = true;
 			if (polling.current) clearTimeout(polling.current);
 		};
 	}, []);
@@ -116,13 +96,12 @@ export default function ExportJobDetailPage() {
 	const handleExportRequest = async (
 		exportType: "adapter" | "merged" | "gguf",
 	) => {
-		if (!job || job.export_status || isWaitingForResponse) return;
+		if (!job || exportingType) return;
 
-		setIsWaitingForResponse(true);
-		setCurrentlyProcessingType(exportType);
+		setExportingType(exportType);
 
 		try {
-			const response = await fetch("/api/export", {
+			const response = await fetch("/api/exports", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({
@@ -137,14 +116,13 @@ export default function ExportJobDetailPage() {
 				throw new Error(errorData.error || "Export request failed");
 			}
 
-			// Fetch updated job status after successful export completion
+			// After successful request, fetch updated status
 			await fetchJobStatus();
-			toast.success(`${exportType.toUpperCase()} export completed`);
+			toast.success(`${exportType.toUpperCase()} export started`);
 		} catch (err: unknown) {
-			toast.error(`Failed to export ${exportType.toUpperCase()}`);
+			toast.error(`Failed to start ${exportType.toUpperCase()} export`);
 		} finally {
-			setIsWaitingForResponse(false);
-			setCurrentlyProcessingType(null);
+			setExportingType(null);
 		}
 	};
 
@@ -177,13 +155,67 @@ export default function ExportJobDetailPage() {
 	}
 
 	const ModalityIcon = job.modality === "vision" ? ImageIcon : FileTextIcon;
-	const hasExportStatus = !!job.export_status;
 
-	// Determine UI states based on scenarios
-	const shouldShowRefresh = hasExportStatus; // Show refresh button ONLY when export is already running (from page load)
-	const shouldDisableRefresh =
-		refreshing || isWaitingForResponse || isPolling; // Disable refresh during manual refresh, export API calls, or polling
-	const shouldDisableExportButtons = hasExportStatus || isWaitingForResponse; // Disable export buttons when export running or export in progress
+	// Determine if we should show banner and what type
+	const getBannerInfo = () => {
+		// If currently exporting (waiting for response), show pending banner
+		if (exportingType) {
+			return {
+				show: true,
+				color: "border-yellow-300",
+				bgColor: "bg-yellow-500",
+				title: "Pending",
+				message: `Exporting ${exportingType}`,
+				showSpinner: true,
+			};
+		}
+
+		// If no latest_export, don't show banner
+		if (!job.latest_export) {
+			return { show: false };
+		}
+
+		const { status, type, message } = job.latest_export;
+
+		if (status === "completed") {
+			return {
+				show: true,
+				color: "border-emerald-300",
+				bgColor: "bg-emerald-500",
+				title: `${type.toUpperCase()} was exported in the most recent export job`,
+				message: message || "",
+			};
+		}
+
+		if (status === "failed") {
+			return {
+				show: true,
+				color: "border-red-300",
+				bgColor: "bg-red-500",
+				title: `Error occurred when exporting ${type}`,
+				message: message || "",
+			};
+		}
+
+		if (status === "running") {
+			return {
+				show: true,
+				color: "border-blue-300",
+				bgColor: "bg-blue-500",
+				title: `Exporting ${type}`,
+				message: message || "",
+				showSpinner: true,
+			};
+		}
+
+		return { show: false };
+	};
+
+	const bannerInfo = getBannerInfo();
+
+	// Disable export buttons if any export is running or we're waiting for response
+	const shouldDisableExportButtons =
+		!!exportingType || job.latest_export?.status === "running";
 
 	return (
 		<div className="max-w-4xl mx-auto py-8 space-y-6">
@@ -197,27 +229,6 @@ export default function ExportJobDetailPage() {
 						Manage and download your model exports
 					</p>
 				</div>
-				{shouldShowRefresh && (
-					<Button
-						variant="outline"
-						size="sm"
-						onClick={() => fetchJobStatus(true)}
-						disabled={shouldDisableRefresh}
-						className="flex items-center gap-2"
-					>
-						<RefreshCw
-							className={cn(
-								"w-4 h-4",
-								shouldDisableRefresh && "animate-spin",
-							)}
-						/>
-						{refreshing
-							? "Refreshing..."
-							: isPolling
-								? "Auto-refreshing..."
-								: "Refresh"}
-					</Button>
-				)}
 			</div>
 
 			{/* Job Information */}
@@ -225,7 +236,7 @@ export default function ExportJobDetailPage() {
 				<CardHeader>
 					<CardTitle className="flex items-center gap-2">
 						<ModalityIcon className="w-5 h-5 text-muted-foreground" />
-						{job.job_name ?? job.job_id}
+						{job.job_id}
 					</CardTitle>
 				</CardHeader>
 				<CardContent className="space-y-4">
@@ -248,42 +259,33 @@ export default function ExportJobDetailPage() {
 				</CardContent>
 			</Card>
 
-			{/* Status Banner */}
-			<div
-				className={cn(
-					"p-4 rounded-lg border-2",
-					hasExportStatus || isWaitingForResponse
-						? "border-blue-300"
-						: "border-emerald-300",
-				)}
-			>
-				<div className="flex items-center gap-3">
-					<div
-						className={cn(
-							"w-3 h-3 rounded-full",
-							hasExportStatus || isWaitingForResponse
-								? "bg-blue-500 animate-pulse"
-								: "bg-emerald-500",
+			{/* Status Banner - Only show when needed */}
+			{bannerInfo.show && (
+				<div
+					className={cn("p-4 rounded-lg border-2", bannerInfo.color)}
+				>
+					<div className="flex items-center gap-4">
+						{bannerInfo.showSpinner ? (
+							<Loader2 className="w-4 h-4 animate-spin text-current" />
+						) : (
+							<div
+								className={cn(
+									"w-3 h-3 rounded-full min-w-3",
+									bannerInfo.bgColor,
+								)}
+							/>
 						)}
-					/>
-					<div>
-						<p className="font-medium">
-							{isWaitingForResponse
-								? `Processing ${currentlyProcessingType} export...`
-								: hasExportStatus
-									? `Processing ${job.export_status} export...`
-									: "Ready for export"}
-						</p>
-						<p className="text-sm text-muted-foreground">
-							{isWaitingForResponse
-								? "Please wait while your export is being processed"
-								: hasExportStatus
-									? "Export in progress, page will auto-refresh every 10 seconds"
-									: "All export types are available"}
-						</p>
+						<div>
+							<p className="font-medium">{bannerInfo.title}</p>
+							{bannerInfo.message && (
+								<p className="text-sm text-muted-foreground">
+									{bannerInfo.message}
+								</p>
+							)}
+						</div>
 					</div>
 				</div>
-			</div>
+			)}
 
 			{/* Export Types */}
 			<Card>
@@ -299,7 +301,7 @@ export default function ExportJobDetailPage() {
 						<div className="border rounded-lg p-4 space-y-3">
 							<div className="flex items-center justify-between">
 								<h3 className="font-medium">Adapter</h3>
-								{job.export?.adapter ? (
+								{job.artifacts?.file?.adapter ? (
 									<Badge
 										variant="default"
 										className="bg-white"
@@ -317,12 +319,12 @@ export default function ExportJobDetailPage() {
 							<p className="text-sm text-muted-foreground">
 								LoRA adapter weights for fine-tuning
 							</p>
-							{job.export?.adapter ? (
+							{job.artifacts?.file?.adapter ? (
 								<Button
 									onClick={() =>
 										handleDownload(
 											"adapter",
-											job.export?.adapter || "",
+											job.artifacts?.file?.adapter || "",
 										)
 									}
 									className="w-full"
@@ -341,13 +343,10 @@ export default function ExportJobDetailPage() {
 									size="sm"
 									variant="outline"
 								>
-									{(isWaitingForResponse &&
-										currentlyProcessingType ===
-											"adapter") ||
-									job.export_status === "adapter" ? (
+									{exportingType === "adapter" ? (
 										<>
 											<Loader2 className="animate-spin" />
-											Processing...
+											Export
 										</>
 									) : (
 										"Create Export"
@@ -360,7 +359,7 @@ export default function ExportJobDetailPage() {
 						<div className="border rounded-lg p-4 space-y-3">
 							<div className="flex items-center justify-between">
 								<h3 className="font-medium">Merged Model</h3>
-								{job.export?.merged ? (
+								{job.artifacts?.file?.merged ? (
 									<Badge
 										variant="default"
 										className="bg-white"
@@ -378,12 +377,12 @@ export default function ExportJobDetailPage() {
 							<p className="text-sm text-muted-foreground">
 								Complete merged model ready for inference
 							</p>
-							{job.export?.merged ? (
+							{job.artifacts?.file?.merged ? (
 								<Button
 									onClick={() =>
 										handleDownload(
 											"merged",
-											job.export?.merged || "",
+											job.artifacts?.file?.merged || "",
 										)
 									}
 									className="w-full"
@@ -402,12 +401,10 @@ export default function ExportJobDetailPage() {
 									size="sm"
 									variant="outline"
 								>
-									{(isWaitingForResponse &&
-										currentlyProcessingType === "merged") ||
-									job.export_status === "merged" ? (
+									{exportingType === "merged" ? (
 										<>
 											<Loader2 className="animate-spin" />
-											Processing...
+											Export
 										</>
 									) : (
 										"Create Export"
@@ -420,7 +417,7 @@ export default function ExportJobDetailPage() {
 						<div className="border rounded-lg p-4 space-y-3">
 							<div className="flex items-center justify-between">
 								<h3 className="font-medium">GGUF</h3>
-								{job.export?.gguf ? (
+								{job.artifacts?.file?.gguf ? (
 									<Badge
 										variant="default"
 										className="bg-white"
@@ -438,12 +435,12 @@ export default function ExportJobDetailPage() {
 							<p className="text-sm text-muted-foreground">
 								Quantized model for efficient inference
 							</p>
-							{job.export?.gguf ? (
+							{job.artifacts?.file?.gguf ? (
 								<Button
 									onClick={() =>
 										handleDownload(
 											"gguf",
-											job.export?.gguf || "",
+											job.artifacts?.file?.gguf || "",
 										)
 									}
 									className="w-full"
@@ -460,12 +457,10 @@ export default function ExportJobDetailPage() {
 									size="sm"
 									variant="outline"
 								>
-									{(isWaitingForResponse &&
-										currentlyProcessingType === "gguf") ||
-									job.export_status === "gguf" ? (
+									{exportingType === "gguf" ? (
 										<>
 											<Loader2 className="animate-spin" />
-											Processing...
+											Export
 										</>
 									) : (
 										"Create Export"
