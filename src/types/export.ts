@@ -57,11 +57,8 @@ export interface ExportRequest {
 	hf_token?: string;
 }
 
-export interface ExportInfo {
-	type: ExportType;
-	path: string;
-}
-
 export interface ExportResponse {
-	export_info: ExportInfo;
+	success: boolean;
+	message: string;
+	export_id: string;
 }

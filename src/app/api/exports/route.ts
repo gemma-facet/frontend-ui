@@ -1,8 +1,4 @@
-import type {
-	ExportJobsResponse,
-	ExportRequest,
-	ExportResponse,
-} from "@/types/export";
+import type { ExportRequest, ExportResponse, JobSchema } from "@/types/export";
 import { NextResponse } from "next/server";
 import { EXPORT_SERVICE_URL } from "../env";
 import { backendFetch } from "../utils";
@@ -21,7 +17,7 @@ export async function GET(request: Request) {
 		const data = await res.json();
 		if (!res.ok)
 			throw new Error(data.error || "Failed to fetch export jobs");
-		return NextResponse.json(data as ExportJobsResponse);
+		return NextResponse.json(data as JobSchema[]);
 	} catch (err: unknown) {
 		return NextResponse.json(
 			{ error: err instanceof Error ? err.message : String(err) },
