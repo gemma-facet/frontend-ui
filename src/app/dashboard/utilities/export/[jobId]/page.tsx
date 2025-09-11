@@ -14,6 +14,7 @@ import {
 	Loader2,
 	XCircleIcon,
 } from "lucide-react";
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -26,8 +27,25 @@ export default function ExportJobDetailPage() {
 	const [exportingType, setExportingType] = useState<
 		"adapter" | "merged" | "gguf" | null
 	>(null);
+	const [hfToken, setHfToken] = useState<string>("");
 
 	const polling = useRef<NodeJS.Timeout | null>(null);
+
+	// Detect provider from base model ID
+	const baseModelParts = job?.base_model_id?.split("/");
+	const provider =
+		baseModelParts?.[0] === "unsloth" ? "unsloth" : "huggingface";
+
+	// Load HF token from localStorage
+	useEffect(() => {
+		const storedHfToken =
+			typeof window !== "undefined"
+				? localStorage.getItem("hfToken")
+				: null;
+		if (storedHfToken) {
+			setHfToken(storedHfToken);
+		}
+	}, []);
 
 	// Fetch job data
 	useEffect(() => {
@@ -108,7 +126,7 @@ export default function ExportJobDetailPage() {
 				body: JSON.stringify({
 					job_id: job.job_id,
 					export_type: exportType,
-					hf_token: undefined, // Add HF token if needed
+					hf_token: hfToken,
 				}),
 			});
 
@@ -216,9 +234,9 @@ export default function ExportJobDetailPage() {
 
 	const bannerInfo = getBannerInfo();
 
-	// Disable export buttons if any export is running or we're waiting for response
+	// Disable export buttons if any export is running, we're waiting for response, or HF token is missing
 	const shouldDisableExportButtons =
-		!!exportingType || job.latest_export?.status === "running";
+		!!exportingType || job.latest_export?.status === "running" || !hfToken;
 
 	return (
 		<div className="max-w-4xl mx-auto py-8 space-y-6">
@@ -294,6 +312,33 @@ export default function ExportJobDetailPage() {
 				</div>
 			)}
 
+			{/* HF Token Required Notice - Show when token is missing */}
+			{!hfToken && (
+				<Card className="border-amber-200 bg-amber-50">
+					<CardContent className="pt-6">
+						<div className="flex items-center gap-3">
+							<XCircleIcon className="w-5 h-5 text-amber-600" />
+							<div>
+								<p className="font-medium text-amber-800">
+									HuggingFace API Key Required
+								</p>
+								<p className="text-sm text-amber-700 mt-1">
+									Please set up your HuggingFace API key in
+									your{" "}
+									<Link
+										href="/dashboard/profile"
+										className="underline hover:no-underline font-medium"
+									>
+										Profile
+									</Link>{" "}
+									to continue with exports.
+								</p>
+							</div>
+						</div>
+					</CardContent>
+				</Card>
+			)}
+
 			{/* Export Types */}
 			<Card>
 				<CardHeader>
@@ -355,6 +400,8 @@ export default function ExportJobDetailPage() {
 											<Loader2 className="animate-spin" />
 											Export
 										</>
+									) : !hfToken ? (
+										"HF Token Required"
 									) : (
 										"Create Export"
 									)}
@@ -413,6 +460,8 @@ export default function ExportJobDetailPage() {
 											<Loader2 className="animate-spin" />
 											Export
 										</>
+									) : !hfToken ? (
+										"HF Token Required"
 									) : (
 										"Create Export"
 									)}
@@ -469,6 +518,8 @@ export default function ExportJobDetailPage() {
 											<Loader2 className="animate-spin" />
 											Export
 										</>
+									) : !hfToken ? (
+										"HF Token Required"
 									) : (
 										"Create Export"
 									)}
