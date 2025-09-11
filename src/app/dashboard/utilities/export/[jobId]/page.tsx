@@ -12,6 +12,7 @@ import {
 	FileTextIcon,
 	ImageIcon,
 	Loader2,
+	XCircleIcon,
 } from "lucide-react";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -184,6 +185,7 @@ export default function ExportJobDetailPage() {
 				bgColor: "bg-emerald-500",
 				title: `${type.toUpperCase()} was exported in the most recent export job`,
 				message: message || "",
+				iconType: "success",
 			};
 		}
 
@@ -194,6 +196,7 @@ export default function ExportJobDetailPage() {
 				bgColor: "bg-red-500",
 				title: `Error occurred when exporting ${type}`,
 				message: message || "",
+				iconType: "error",
 			};
 		}
 
@@ -252,7 +255,7 @@ export default function ExportJobDetailPage() {
 						<p className="text-sm font-medium text-muted-foreground mb-1">
 							Job ID
 						</p>
-						<p className="text-xs font-mono bg-muted px-2 py-1 rounded">
+						<p className="text-sm font-mono bg-muted px-2 py-1 rounded">
 							{job.job_id}
 						</p>
 					</div>
@@ -267,6 +270,10 @@ export default function ExportJobDetailPage() {
 					<div className="flex items-center gap-4">
 						{bannerInfo.showSpinner ? (
 							<Loader2 className="w-4 h-4 animate-spin text-current" />
+						) : bannerInfo.iconType === "success" ? (
+							<CheckCircleIcon className="w-5 h-5 text-emerald-500" />
+						) : bannerInfo.iconType === "error" ? (
+							<XCircleIcon className="w-5 h-5 text-red-500" />
 						) : (
 							<div
 								className={cn(
