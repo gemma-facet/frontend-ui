@@ -17,7 +17,7 @@ import {
 import { auth } from "@/lib/firebase";
 import { signOut } from "firebase/auth";
 import { useAtom } from "jotai";
-import { LogOut, User as UserIcon } from "lucide-react";
+import { Download, LogOut, User as UserIcon } from "lucide-react";
 import {
 	BarChart3,
 	Component,
@@ -83,6 +83,11 @@ const utilities = [
 		title: "Model Evaluation",
 		url: "/dashboard/utilities/evaluation",
 		icon: BarChart3,
+	},
+	{
+		title: "Model Export",
+		url: "/dashboard/utilities/export",
+		icon: Download,
 	},
 ];
 
