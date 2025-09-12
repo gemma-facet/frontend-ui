@@ -9,7 +9,6 @@ import {
 	CardTitle,
 } from "@/components/ui/card";
 import type { JobSchema } from "@/types/export";
-import { FileTextIcon, ImageIcon } from "lucide-react";
 import Link from "next/link";
 
 export type ExportJobCardProps = {
@@ -17,20 +16,26 @@ export type ExportJobCardProps = {
 };
 
 export default function ExportJobCard({ job }: ExportJobCardProps) {
-	const ModalityIcon = job.modality === "vision" ? ImageIcon : FileTextIcon;
-
-	const getExportTypes = () => {
+	const getFileExportTypes = () => {
 		const artifacts = job.artifacts?.file;
-		const exportTypes = [
+		return [
 			{ type: "Adapter", available: !!artifacts?.adapter },
 			{ type: "Merged", available: !!artifacts?.merged },
 			{ type: "GGUF", available: !!artifacts?.gguf },
 		];
-
-		return exportTypes;
 	};
 
-	const exportTypes = getExportTypes();
+	const getHfExportTypes = () => {
+		const artifacts = job.artifacts?.hf;
+		return [
+			{ type: "Adapter", available: !!artifacts?.adapter },
+			{ type: "Merged", available: !!artifacts?.merged },
+			{ type: "GGUF", available: !!artifacts?.gguf },
+		];
+	};
+
+	const fileExportTypes = getFileExportTypes();
+	const hfExportTypes = getHfExportTypes();
 
 	return (
 		<Link href={`/dashboard/utilities/export/${job.job_id}`}>
@@ -41,12 +46,8 @@ export default function ExportJobCard({ job }: ExportJobCardProps) {
 							<CardTitle className="text-lg truncate text-wrap">
 								{job.job_id}
 							</CardTitle>
-							<ModalityIcon className="w-4 h-4 text-muted-foreground flex-shrink-0" />
 						</div>
 					</div>
-					<CardDescription className="text-sm font-medium text-emerald-600">
-						Ready to export
-					</CardDescription>
 				</CardHeader>
 
 				<CardContent className="space-y-2">
@@ -59,26 +60,46 @@ export default function ExportJobCard({ job }: ExportJobCardProps) {
 						</p>
 					</div>
 
-					<div className="pt-2 border-t">
-						<p className="text-xs text-muted-foreground mb-2">
-							Export types
-						</p>
-						<div className="flex flex-wrap gap-1">
-							{exportTypes.map(exportItem => (
-								<Badge
-									key={exportItem.type}
-									variant={
-										exportItem.available
-											? "default"
-											: "outline"
-									}
-									className={`text-xs ${
-										exportItem.available ? "bg-white" : ""
-									}`}
-								>
-									{exportItem.type}
-								</Badge>
-							))}
+					<div className="pt-2 border-t space-y-3">
+						<div>
+							<p className="text-xs text-muted-foreground mb-2">
+								Direct downloads (GCS)
+							</p>
+							<div className="flex flex-wrap gap-1">
+								{fileExportTypes.map(item => (
+									<Badge
+										key={`file-${item.type}`}
+										variant={
+											item.available
+												? "default"
+												: "outline"
+										}
+										className={`text-xs ${item.available ? "bg-white" : ""}`}
+									>
+										{item.type}
+									</Badge>
+								))}
+							</div>
+						</div>
+						<div>
+							<p className="text-xs text-muted-foreground mb-2">
+								Hugging Face Hub
+							</p>
+							<div className="flex flex-wrap gap-1">
+								{hfExportTypes.map(item => (
+									<Badge
+										key={`hf-${item.type}`}
+										variant={
+											item.available
+												? "default"
+												: "outline"
+										}
+										className={`text-xs ${item.available ? "bg-white" : ""}`}
+									>
+										{item.type}
+									</Badge>
+								))}
+							</div>
 						</div>
 					</div>
 				</CardContent>

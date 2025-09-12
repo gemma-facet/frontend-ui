@@ -62,7 +62,7 @@ export interface GetExportResponse extends JobSchema {
 export interface ExportRequest {
 	job_id: string;
 	export_type: ExportType;
-	destinations: ExportDestination[];
+	destination: ExportDestination[];
 	hf_token?: string;
 	hf_repo_id?: string;
 }

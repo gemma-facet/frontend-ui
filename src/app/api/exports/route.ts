@@ -29,39 +29,39 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
 	try {
 		const body = await request.json();
-		const { job_id, export_type, destinations, hf_token, hf_repo_id } =
+		const { job_id, export_type, destination, hf_token, hf_repo_id } =
 			body as Partial<ExportRequest>;
 
 		if (
 			!job_id ||
 			!export_type ||
-			!destinations ||
-			destinations.length === 0
+			!destination ||
+			destination.length === 0
 		) {
 			return NextResponse.json(
 				{
-					error: "job_id, export_type, and destinations are required",
+					error: "job_id, export_type, and destination are required",
 				},
 				{ status: 400 },
 			);
 		}
 
-		// Validate destinations
-		const validDestinations = ["gcs", "hf_hub"];
-		const invalidDestinations = destinations.filter(
-			dest => !validDestinations.includes(dest),
+		// Validate destination
+		const validdestination = ["gcs", "hf_hub"];
+		const invaliddestination = destination.filter(
+			dest => !validdestination.includes(dest),
 		);
-		if (invalidDestinations.length > 0) {
+		if (invaliddestination.length > 0) {
 			return NextResponse.json(
 				{
-					error: `Invalid destinations: ${invalidDestinations.join(", ")}. Valid destinations are: gcs, hf_hub`,
+					error: `Invalid destination: ${invaliddestination.join(", ")}. Valid destination are: gcs, hf_hub`,
 				},
 				{ status: 400 },
 			);
 		}
 
 		// If hf_hub is selected, require hf_token and hf_repo_id
-		if (destinations.includes("hf_hub")) {
+		if (destination.includes("hf_hub")) {
 			if (!hf_token) {
 				return NextResponse.json(
 					{
@@ -89,7 +89,7 @@ export async function POST(request: Request) {
 				body: JSON.stringify({
 					job_id,
 					export_type,
-					destinations,
+					destination,
 					hf_token,
 					hf_repo_id,
 				}),
