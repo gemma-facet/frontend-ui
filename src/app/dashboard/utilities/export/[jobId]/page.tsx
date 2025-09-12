@@ -129,6 +129,17 @@ export default function ExportJobDetailPage() {
 		};
 	}, []);
 
+	// Auto-unselect GCS if it becomes unavailable for selected type
+	useEffect(() => {
+		if (
+			selectedExportType &&
+			isExportAvailable(selectedExportType, "gcs") &&
+			selectedDestinations.includes("gcs")
+		) {
+			setSelectedDestinations(prev => prev.filter(d => d !== "gcs"));
+		}
+	}, [selectedExportType, selectedDestinations]);
+
 	const handleExportRequest = async () => {
 		if (!job || !selectedExportType || selectedDestinations.length === 0)
 			return;
@@ -174,9 +185,9 @@ export default function ExportJobDetailPage() {
 		destination: ExportDestination,
 		checked: boolean,
 	) => {
-		if (checked) {
+		if (checked === true) {
 			setSelectedDestinations(prev => [...prev, destination]);
-		} else {
+		} else if (checked === false) {
 			setSelectedDestinations(prev =>
 				prev.filter(d => d !== destination),
 			);
@@ -471,6 +482,13 @@ export default function ExportJobDetailPage() {
 												checked as boolean,
 											)
 										}
+										disabled={
+											!!selectedExportType &&
+											isExportAvailable(
+												selectedExportType,
+												"gcs",
+											)
+										}
 									/>
 									<Label
 										htmlFor="dest-gcs"
@@ -528,6 +546,8 @@ export default function ExportJobDetailPage() {
 									selectedDestinations.length === 0 ||
 									(selectedDestinations.includes("hf_hub") &&
 										!hfRepoId.trim()) ||
+									(selectedDestinations.includes("hf_hub") &&
+										!hfToken) ||
 									!!exportingType
 								}
 							>
