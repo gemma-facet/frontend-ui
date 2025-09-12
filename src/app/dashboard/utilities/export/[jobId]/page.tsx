@@ -1,19 +1,31 @@
 "use client";
 
+// TODO: Checkout the new layout and try it out
+
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { RadioCardGroup, RadioCardGroupItem } from "@/components/ui/radio-card";
 import { cn } from "@/lib/utils";
-import type { GetExportResponse } from "@/types/export";
+import type {
+	ExportDestination,
+	ExportType,
+	GetExportResponse,
+} from "@/types/export";
 import {
 	CheckCircleIcon,
 	ClockIcon,
 	Download,
+	ExternalLink,
 	FileTextIcon,
 	ImageIcon,
 	Loader2,
 	XCircleIcon,
 } from "lucide-react";
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -23,11 +35,34 @@ export default function ExportJobDetailPage() {
 	const [job, setJob] = useState<GetExportResponse | null>(null);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
-	const [exportingType, setExportingType] = useState<
-		"adapter" | "merged" | "gguf" | null
-	>(null);
+	const [exportingType, setExportingType] = useState<ExportType | null>(null);
+	const [hfToken, setHfToken] = useState<string>("");
+
+	// Export modal state
+	const [selectedExportType, setSelectedExportType] =
+		useState<ExportType | null>(null);
+	const [selectedDestinations, setSelectedDestinations] = useState<
+		ExportDestination[]
+	>([]);
+	const [hfRepoId, setHfRepoId] = useState<string>("");
 
 	const polling = useRef<NodeJS.Timeout | null>(null);
+
+	// Detect provider from base model ID
+	const baseModelParts = job?.base_model_id?.split("/");
+	const provider =
+		baseModelParts?.[0] === "unsloth" ? "unsloth" : "huggingface";
+
+	// Load HF token from localStorage
+	useEffect(() => {
+		const storedHfToken =
+			typeof window !== "undefined"
+				? localStorage.getItem("hfToken")
+				: null;
+		if (storedHfToken) {
+			setHfToken(storedHfToken);
+		}
+	}, []);
 
 	// Fetch job data
 	useEffect(() => {
@@ -94,12 +129,11 @@ export default function ExportJobDetailPage() {
 		};
 	}, []);
 
-	const handleExportRequest = async (
-		exportType: "adapter" | "merged" | "gguf",
-	) => {
-		if (!job || exportingType) return;
+	const handleExportRequest = async () => {
+		if (!job || !selectedExportType || selectedDestinations.length === 0)
+			return;
 
-		setExportingType(exportType);
+		setExportingType(selectedExportType);
 
 		try {
 			const response = await fetch("/api/exports", {
@@ -107,8 +141,10 @@ export default function ExportJobDetailPage() {
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({
 					job_id: job.job_id,
-					export_type: exportType,
-					hf_token: undefined, // Add HF token if needed
+					export_type: selectedExportType,
+					destinations: selectedDestinations,
+					hf_token: hfToken,
+					hf_repo_id: hfRepoId,
 				}),
 			});
 
@@ -119,21 +155,81 @@ export default function ExportJobDetailPage() {
 
 			// After successful request, fetch updated status
 			await fetchJobStatus();
-			toast.success(`${exportType.toUpperCase()} export started`);
+			toast.success(`${selectedExportType.toUpperCase()} export started`);
+
+			// Reset state
+			setSelectedExportType(null);
+			setSelectedDestinations([]);
+			setHfRepoId("");
 		} catch (err: unknown) {
-			toast.error(`Failed to start ${exportType.toUpperCase()} export`);
+			toast.error(
+				`Failed to start ${selectedExportType?.toUpperCase()} export`,
+			);
 		} finally {
 			setExportingType(null);
 		}
 	};
 
-	const handleDownload = (
-		exportType: "adapter" | "merged" | "gguf",
-		path: string,
+	const handleDestinationChange = (
+		destination: ExportDestination,
+		checked: boolean,
 	) => {
+		if (checked) {
+			setSelectedDestinations(prev => [...prev, destination]);
+		} else {
+			setSelectedDestinations(prev =>
+				prev.filter(d => d !== destination),
+			);
+		}
+	};
+
+	const handleDownload = (path: string) => {
 		// Simulate download
 		window.open(path, "_blank");
-		toast.success(`${exportType.toUpperCase()} download started`);
+		toast.success("Download started");
+	};
+
+	const handleViewHFRepo = (repoId: string) => {
+		window.open(`https://huggingface.co/${repoId}`, "_blank");
+	};
+
+	// Helper functions to check if exports are available
+	const isExportAvailable = (
+		exportType: ExportType,
+		destination: ExportDestination,
+	) => {
+		if (!job?.artifacts) return false;
+
+		if (destination === "gcs") {
+			return !!job.artifacts.file?.[exportType];
+		}
+		if (destination === "hf_hub") {
+			return !!job.artifacts.hf?.[exportType];
+		}
+		return false;
+	};
+
+	const getExportPath = (
+		exportType: ExportType,
+		destination: ExportDestination,
+	) => {
+		if (!job?.artifacts) return "";
+
+		if (destination === "gcs") {
+			return job.artifacts.file?.[exportType] || "";
+		}
+		if (destination === "hf_hub") {
+			return job.artifacts.hf?.[exportType] || "";
+		}
+		return "";
+	};
+
+	const canExport = () => {
+		// Can export if not currently exporting and HF token is available when needed
+		return (
+			!exportingType &&
+			(!!hfToken || !selectedDestinations.includes("hf_hub"))
+		);
 	};
 
 	if (loading) {
@@ -216,10 +312,6 @@ export default function ExportJobDetailPage() {
 
 	const bannerInfo = getBannerInfo();
 
-	// Disable export buttons if any export is running or we're waiting for response
-	const shouldDisableExportButtons =
-		!!exportingType || job.latest_export?.status === "running";
-
 	return (
 		<div className="max-w-4xl mx-auto py-8 space-y-6">
 			{/* Header */}
@@ -294,6 +386,165 @@ export default function ExportJobDetailPage() {
 				</div>
 			)}
 
+			{/* HF Token Required Notice - Show when token is missing */}
+			{!hfToken && (
+				<Card className="border-amber-200 bg-amber-50">
+					<CardContent className="pt-6">
+						<div className="flex items-center gap-3">
+							<XCircleIcon className="w-5 h-5 text-amber-600" />
+							<div>
+								<p className="font-medium text-amber-800">
+									HuggingFace API Key Required
+								</p>
+								<p className="text-sm text-amber-700 mt-1">
+									Please set up your HuggingFace API key in
+									your{" "}
+									<Link
+										href="/dashboard/profile"
+										className="underline hover:no-underline font-medium"
+									>
+										Profile
+									</Link>{" "}
+									to continue with exports.
+								</p>
+							</div>
+						</div>
+					</CardContent>
+				</Card>
+			)}
+
+			{/* Create Export Card - visible only if no running export */}
+			{(!job.latest_export ||
+				job.latest_export.status === "completed" ||
+				job.latest_export.status === "failed") && (
+				<Card>
+					<CardHeader>
+						<CardTitle>Create Export</CardTitle>
+					</CardHeader>
+					<CardContent className="space-y-4">
+						<div>
+							<Label className="text-sm font-medium mb-3 block">
+								Select what to export
+							</Label>
+							<RadioCardGroup
+								value={selectedExportType || ""}
+								onValueChange={value =>
+									setSelectedExportType(value as ExportType)
+								}
+								className="grid grid-cols-3 gap-2"
+							>
+								<RadioCardGroupItem
+									value="adapter"
+									id="export-adapter"
+								>
+									Adapter
+								</RadioCardGroupItem>
+								<RadioCardGroupItem
+									value="merged"
+									id="export-merged"
+								>
+									Merged
+								</RadioCardGroupItem>
+								<RadioCardGroupItem
+									value="gguf"
+									id="export-gguf"
+								>
+									GGUF
+								</RadioCardGroupItem>
+							</RadioCardGroup>
+						</div>
+
+						<div>
+							<Label className="text-sm font-medium mb-3 block">
+								Select destination(s)
+							</Label>
+							<div className="space-y-3">
+								<div className="flex items-center space-x-2">
+									<Checkbox
+										id="dest-gcs"
+										checked={selectedDestinations.includes(
+											"gcs",
+										)}
+										onCheckedChange={checked =>
+											handleDestinationChange(
+												"gcs",
+												checked as boolean,
+											)
+										}
+									/>
+									<Label
+										htmlFor="dest-gcs"
+										className="text-sm"
+									>
+										Direct Download (GCS)
+									</Label>
+								</div>
+								<div className="flex items-center space-x-2">
+									<Checkbox
+										id="dest-hf"
+										checked={selectedDestinations.includes(
+											"hf_hub",
+										)}
+										onCheckedChange={checked =>
+											handleDestinationChange(
+												"hf_hub",
+												checked as boolean,
+											)
+										}
+									/>
+									<Label
+										htmlFor="dest-hf"
+										className="text-sm"
+									>
+										Hugging Face Hub
+									</Label>
+								</div>
+							</div>
+						</div>
+
+						{selectedDestinations.includes("hf_hub") && (
+							<div>
+								<Label
+									htmlFor="hf_repo_id"
+									className="text-sm font-medium"
+								>
+									HF Repository ID
+								</Label>
+								<Input
+									id="hf_repo_id"
+									placeholder="username/model-name"
+									value={hfRepoId}
+									onChange={e => setHfRepoId(e.target.value)}
+									className="mt-1"
+								/>
+							</div>
+						)}
+
+						<div className="flex justify-end gap-2 pt-2">
+							<Button
+								onClick={handleExportRequest}
+								disabled={
+									!selectedExportType ||
+									selectedDestinations.length === 0 ||
+									(selectedDestinations.includes("hf_hub") &&
+										!hfRepoId.trim()) ||
+									!!exportingType
+								}
+							>
+								{exportingType ? (
+									<>
+										<Loader2 className="w-4 h-4 mr-2 animate-spin" />
+										Starting export...
+									</>
+								) : (
+									"Start Export"
+								)}
+							</Button>
+						</div>
+					</CardContent>
+				</Card>
+			)}
+
 			{/* Export Types */}
 			<Card>
 				<CardHeader>
@@ -303,177 +554,238 @@ export default function ExportJobDetailPage() {
 					</p>
 				</CardHeader>
 				<CardContent>
-					<div className="grid md:grid-cols-3 gap-4">
+					<div className="grid md:grid-cols-3 gap-6">
 						{/* Adapter Export */}
-						<div className="border rounded-lg p-4 space-y-3">
+						<div className="border rounded-lg p-6 space-y-4">
 							<div className="flex items-center justify-between">
-								<h3 className="font-medium">Adapter</h3>
-								{job.artifacts?.file?.adapter ? (
-									<Badge
-										variant="default"
-										className="bg-white"
-									>
-										<CheckCircleIcon className="w-3 h-3 mr-1" />
-										Available
-									</Badge>
-								) : (
-									<Badge variant="outline">
-										<ClockIcon className="w-3 h-3 mr-1" />
-										Not available
-									</Badge>
-								)}
+								<h3 className="font-medium text-lg">Adapter</h3>
 							</div>
 							<p className="text-sm text-muted-foreground">
 								LoRA adapter weights for fine-tuning
 							</p>
-							{job.artifacts?.file?.adapter ? (
-								<Button
-									onClick={() =>
-										handleDownload(
-											"adapter",
-											job.artifacts?.file?.adapter || "",
-										)
-									}
-									className="w-full"
-									size="sm"
-								>
-									<Download />
-									Download
-								</Button>
-							) : (
-								<Button
-									onClick={() =>
-										handleExportRequest("adapter")
-									}
-									disabled={shouldDisableExportButtons}
-									className="w-full"
-									size="sm"
-									variant="outline"
-								>
-									{exportingType === "adapter" ? (
-										<>
-											<Loader2 className="animate-spin" />
-											Export
-										</>
-									) : (
-										"Create Export"
-									)}
-								</Button>
-							)}
+
+							{/* GCS Export */}
+							<div className="space-y-2">
+								<div className="flex items-center justify-between">
+									<span className="text-sm font-medium">
+										Direct Download (GCS)
+									</span>
+								</div>
+								{isExportAvailable("adapter", "gcs") ? (
+									<Button
+										onClick={() =>
+											handleDownload(
+												getExportPath("adapter", "gcs"),
+											)
+										}
+										className="w-full"
+										size="sm"
+									>
+										<Download className="w-4 h-4 mr-2" />
+										Download
+									</Button>
+								) : (
+									<Button
+										disabled
+										className="w-full"
+										size="sm"
+										variant="outline"
+									>
+										Not available
+									</Button>
+								)}
+							</div>
+
+							{/* HF Hub Export */}
+							<div className="space-y-2">
+								<div className="flex items-center justify-between">
+									<span className="text-sm font-medium">
+										Hugging Face Hub
+									</span>
+								</div>
+								{isExportAvailable("adapter", "hf_hub") ? (
+									<Button
+										onClick={() =>
+											handleViewHFRepo(
+												getExportPath(
+													"adapter",
+													"hf_hub",
+												),
+											)
+										}
+										className="w-full"
+										size="sm"
+										variant="outline"
+									>
+										<ExternalLink className="w-4 h-4 mr-2" />
+										View on HF
+									</Button>
+								) : (
+									<Button
+										disabled
+										className="w-full"
+										size="sm"
+										variant="outline"
+									>
+										Not available
+									</Button>
+								)}
+							</div>
 						</div>
 
 						{/* Merged Export */}
-						<div className="border rounded-lg p-4 space-y-3">
+						<div className="border rounded-lg p-6 space-y-4">
 							<div className="flex items-center justify-between">
-								<h3 className="font-medium">Merged Model</h3>
-								{job.artifacts?.file?.merged ? (
-									<Badge
-										variant="default"
-										className="bg-white"
-									>
-										<CheckCircleIcon className="w-3 h-3 mr-1" />
-										Available
-									</Badge>
-								) : (
-									<Badge variant="outline">
-										<ClockIcon className="w-3 h-3 mr-1" />
-										Not available
-									</Badge>
-								)}
+								<h3 className="font-medium text-lg">
+									Merged Model
+								</h3>
 							</div>
 							<p className="text-sm text-muted-foreground">
 								Complete merged model ready for inference
 							</p>
-							{job.artifacts?.file?.merged ? (
-								<Button
-									onClick={() =>
-										handleDownload(
-											"merged",
-											job.artifacts?.file?.merged || "",
-										)
-									}
-									className="w-full"
-									size="sm"
-								>
-									<Download />
-									Download
-								</Button>
-							) : (
-								<Button
-									onClick={() =>
-										handleExportRequest("merged")
-									}
-									disabled={shouldDisableExportButtons}
-									className="w-full"
-									size="sm"
-									variant="outline"
-								>
-									{exportingType === "merged" ? (
-										<>
-											<Loader2 className="animate-spin" />
-											Export
-										</>
-									) : (
-										"Create Export"
-									)}
-								</Button>
-							)}
+
+							{/* GCS Export */}
+							<div className="space-y-2">
+								<div className="flex items-center justify-between">
+									<span className="text-sm font-medium">
+										Direct Download (GCS)
+									</span>
+								</div>
+								{isExportAvailable("merged", "gcs") ? (
+									<Button
+										onClick={() =>
+											handleDownload(
+												getExportPath("merged", "gcs"),
+											)
+										}
+										className="w-full"
+										size="sm"
+									>
+										<Download className="w-4 h-4 mr-2" />
+										Download
+									</Button>
+								) : (
+									<Button
+										disabled
+										className="w-full"
+										size="sm"
+										variant="outline"
+									>
+										Not available
+									</Button>
+								)}
+							</div>
+
+							{/* HF Hub Export */}
+							<div className="space-y-2">
+								<div className="flex items-center justify-between">
+									<span className="text-sm font-medium">
+										Hugging Face Hub
+									</span>
+								</div>
+								{isExportAvailable("merged", "hf_hub") ? (
+									<Button
+										onClick={() =>
+											handleViewHFRepo(
+												getExportPath(
+													"merged",
+													"hf_hub",
+												),
+											)
+										}
+										className="w-full"
+										size="sm"
+										variant="outline"
+									>
+										<ExternalLink className="w-4 h-4 mr-2" />
+										View on HF
+									</Button>
+								) : (
+									<Button
+										disabled
+										className="w-full"
+										size="sm"
+										variant="outline"
+									>
+										Not available
+									</Button>
+								)}
+							</div>
 						</div>
 
 						{/* GGUF Export */}
-						<div className="border rounded-lg p-4 space-y-3">
+						<div className="border rounded-lg p-6 space-y-4">
 							<div className="flex items-center justify-between">
-								<h3 className="font-medium">GGUF</h3>
-								{job.artifacts?.file?.gguf ? (
-									<Badge
-										variant="default"
-										className="bg-white"
-									>
-										<CheckCircleIcon className="w-3 h-3 mr-1" />
-										Available
-									</Badge>
-								) : (
-									<Badge variant="outline">
-										<ClockIcon className="w-3 h-3 mr-1" />
-										Not available
-									</Badge>
-								)}
+								<h3 className="font-medium text-lg">GGUF</h3>
 							</div>
 							<p className="text-sm text-muted-foreground">
 								Quantized model for efficient inference
 							</p>
-							{job.artifacts?.file?.gguf ? (
-								<Button
-									onClick={() =>
-										handleDownload(
-											"gguf",
-											job.artifacts?.file?.gguf || "",
-										)
-									}
-									className="w-full"
-									size="sm"
-								>
-									<Download />
-									Download
-								</Button>
-							) : (
-								<Button
-									onClick={() => handleExportRequest("gguf")}
-									disabled={shouldDisableExportButtons}
-									className="w-full"
-									size="sm"
-									variant="outline"
-								>
-									{exportingType === "gguf" ? (
-										<>
-											<Loader2 className="animate-spin" />
-											Export
-										</>
-									) : (
-										"Create Export"
-									)}
-								</Button>
-							)}
+
+							{/* GCS Export */}
+							<div className="space-y-2">
+								<div className="flex items-center justify-between">
+									<span className="text-sm font-medium">
+										Direct Download (GCS)
+									</span>
+								</div>
+								{isExportAvailable("gguf", "gcs") ? (
+									<Button
+										onClick={() =>
+											handleDownload(
+												getExportPath("gguf", "gcs"),
+											)
+										}
+										className="w-full"
+										size="sm"
+									>
+										<Download className="w-4 h-4 mr-2" />
+										Download
+									</Button>
+								) : (
+									<Button
+										disabled
+										className="w-full"
+										size="sm"
+										variant="outline"
+									>
+										Not available
+									</Button>
+								)}
+							</div>
+
+							{/* HF Hub Export */}
+							<div className="space-y-2">
+								<div className="flex items-center justify-between">
+									<span className="text-sm font-medium">
+										Hugging Face Hub
+									</span>
+								</div>
+								{isExportAvailable("gguf", "hf_hub") ? (
+									<Button
+										onClick={() =>
+											handleViewHFRepo(
+												getExportPath("gguf", "hf_hub"),
+											)
+										}
+										className="w-full"
+										size="sm"
+										variant="outline"
+									>
+										<ExternalLink className="w-4 h-4 mr-2" />
+										View on HF
+									</Button>
+								) : (
+									<Button
+										disabled
+										className="w-full"
+										size="sm"
+										variant="outline"
+									>
+										Not available
+									</Button>
+								)}
+							</div>
 						</div>
 					</div>
 				</CardContent>
