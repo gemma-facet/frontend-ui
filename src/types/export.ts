@@ -30,6 +30,7 @@ export interface JobArtifacts {
 
 export interface JobSchema {
 	job_id: string;
+	job_name: string;
 	user_id: string;
 	adapter_path: string;
 	base_model_id: string;

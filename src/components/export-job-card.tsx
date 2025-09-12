@@ -44,7 +44,7 @@ export default function ExportJobCard({ job }: ExportJobCardProps) {
 					<div className="flex items-start justify-between">
 						<div className="flex items-center gap-3 min-w-0 flex-1">
 							<CardTitle className="text-lg truncate text-wrap">
-								{job.job_id}
+								{job.job_name}
 							</CardTitle>
 						</div>
 					</div>
@@ -57,6 +57,14 @@ export default function ExportJobCard({ job }: ExportJobCardProps) {
 						</p>
 						<p className="text-sm font-medium text-foreground truncate">
 							{job.base_model_id ?? "-"}
+						</p>
+					</div>
+					<div>
+						<p className="text-xs text-muted-foreground mb-1">
+							Job ID
+						</p>
+						<p className="text-sm font-medium text-foreground truncate">
+							{job.job_id}
 						</p>
 					</div>
 

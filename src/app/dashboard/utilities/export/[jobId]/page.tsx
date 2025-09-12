@@ -325,7 +325,7 @@ export default function ExportJobDetailPage() {
 				<CardHeader>
 					<CardTitle className="flex items-center gap-2">
 						<ModalityIcon className="w-5 h-5 text-muted-foreground" />
-						{job.job_id}
+						{job.job_name}
 					</CardTitle>
 				</CardHeader>
 				<CardContent className="space-y-4">
