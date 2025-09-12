@@ -41,9 +41,9 @@ export default function ExportJobDetailPage() {
 	// Export modal state
 	const [selectedExportType, setSelectedExportType] =
 		useState<ExportType | null>(null);
-	const [selectedDestinations, setSelectedDestinations] = useState<
-		ExportDestination[]
-	>([]);
+	// Explicit destination selections
+	const [destGcsSelected, setDestGcsSelected] = useState<boolean>(false);
+	const [destHfSelected, setDestHfSelected] = useState<boolean>(false);
 	const [hfRepoId, setHfRepoId] = useState<string>("");
 
 	const polling = useRef<NodeJS.Timeout | null>(null);
@@ -129,34 +129,32 @@ export default function ExportJobDetailPage() {
 		};
 	}, []);
 
-	// Auto-unselect GCS if it becomes unavailable for selected type
-	useEffect(() => {
-		if (
-			selectedExportType &&
-			isExportAvailable(selectedExportType, "gcs") &&
-			selectedDestinations.includes("gcs")
-		) {
-			setSelectedDestinations(prev => prev.filter(d => d !== "gcs"));
-		}
-	}, [selectedExportType, selectedDestinations]);
+	// Removed auto-unselect logic to avoid losing user intent
 
 	const handleExportRequest = async () => {
-		if (!job || !selectedExportType || selectedDestinations.length === 0)
-			return;
+		if (!job || !selectedExportType) return;
+
+		const destination: ExportDestination[] = [];
+		if (destGcsSelected) destination.push("gcs");
+		if (destHfSelected) destination.push("hf_hub");
+
+		if (destination.length === 0) return;
 
 		setExportingType(selectedExportType);
 
 		try {
+			const payload = {
+				job_id: job.job_id,
+				export_type: selectedExportType,
+				destination,
+				hf_token: hfToken,
+				hf_repo_id: hfRepoId,
+			};
+
 			const response = await fetch("/api/exports", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({
-					job_id: job.job_id,
-					export_type: selectedExportType,
-					destinations: selectedDestinations,
-					hf_token: hfToken,
-					hf_repo_id: hfRepoId,
-				}),
+				body: JSON.stringify(payload),
 			});
 
 			if (!response.ok) {
@@ -170,7 +168,8 @@ export default function ExportJobDetailPage() {
 
 			// Reset state
 			setSelectedExportType(null);
-			setSelectedDestinations([]);
+			setDestGcsSelected(false);
+			setDestHfSelected(false);
 			setHfRepoId("");
 		} catch (err: unknown) {
 			toast.error(
@@ -178,19 +177,6 @@ export default function ExportJobDetailPage() {
 			);
 		} finally {
 			setExportingType(null);
-		}
-	};
-
-	const handleDestinationChange = (
-		destination: ExportDestination,
-		checked: boolean,
-	) => {
-		if (checked === true) {
-			setSelectedDestinations(prev => [...prev, destination]);
-		} else if (checked === false) {
-			setSelectedDestinations(prev =>
-				prev.filter(d => d !== destination),
-			);
 		}
 	};
 
@@ -237,10 +223,7 @@ export default function ExportJobDetailPage() {
 
 	const canExport = () => {
 		// Can export if not currently exporting and HF token is available when needed
-		return (
-			!exportingType &&
-			(!!hfToken || !selectedDestinations.includes("hf_hub"))
-		);
+		return !exportingType && (!!hfToken || !destHfSelected);
 	};
 
 	if (loading) {
@@ -473,14 +456,9 @@ export default function ExportJobDetailPage() {
 								<div className="flex items-center space-x-2">
 									<Checkbox
 										id="dest-gcs"
-										checked={selectedDestinations.includes(
-											"gcs",
-										)}
+										checked={destGcsSelected}
 										onCheckedChange={checked =>
-											handleDestinationChange(
-												"gcs",
-												checked as boolean,
-											)
+											setDestGcsSelected(Boolean(checked))
 										}
 										disabled={
 											!!selectedExportType &&
@@ -500,14 +478,9 @@ export default function ExportJobDetailPage() {
 								<div className="flex items-center space-x-2">
 									<Checkbox
 										id="dest-hf"
-										checked={selectedDestinations.includes(
-											"hf_hub",
-										)}
+										checked={destHfSelected}
 										onCheckedChange={checked =>
-											handleDestinationChange(
-												"hf_hub",
-												checked as boolean,
-											)
+											setDestHfSelected(Boolean(checked))
 										}
 									/>
 									<Label
@@ -520,7 +493,7 @@ export default function ExportJobDetailPage() {
 							</div>
 						</div>
 
-						{selectedDestinations.includes("hf_hub") && (
+						{destHfSelected && (
 							<div>
 								<Label
 									htmlFor="hf_repo_id"
@@ -543,11 +516,9 @@ export default function ExportJobDetailPage() {
 								onClick={handleExportRequest}
 								disabled={
 									!selectedExportType ||
-									selectedDestinations.length === 0 ||
-									(selectedDestinations.includes("hf_hub") &&
-										!hfRepoId.trim()) ||
-									(selectedDestinations.includes("hf_hub") &&
-										!hfToken) ||
+									(!destGcsSelected && !destHfSelected) ||
+									(destHfSelected && !hfRepoId.trim()) ||
+									(destHfSelected && !hfToken) ||
 									!!exportingType
 								}
 							>
