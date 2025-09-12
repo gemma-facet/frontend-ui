@@ -1,8 +1,9 @@
 // New schema types based on backend changes
 export type ExportType = "adapter" | "merged" | "gguf";
 export type ExportStatus = "running" | "completed" | "failed";
-export type ExportVariant = "raw" | "file";
+export type ExportVariant = "raw" | "file" | "hf";
 export type Modality = "text" | "vision";
+export type ExportDestination = "gcs" | "hf_hub";
 
 export interface JobArtifactsFiles {
 	adapter?: string;
@@ -15,9 +16,16 @@ export interface JobArtifactsRaw {
 	merged?: string;
 }
 
+export interface JobArtifactsHF {
+	adapter?: string;
+	merged?: string;
+	gguf?: string;
+}
+
 export interface JobArtifacts {
 	file: JobArtifactsFiles;
 	raw: JobArtifactsRaw;
+	hf: JobArtifactsHF;
 }
 
 export interface JobSchema {
@@ -54,7 +62,9 @@ export interface GetExportResponse extends JobSchema {
 export interface ExportRequest {
 	job_id: string;
 	export_type: ExportType;
+	destinations: ExportDestination[];
 	hf_token?: string;
+	hf_repo_id?: string;
 }
 
 export interface ExportResponse {
