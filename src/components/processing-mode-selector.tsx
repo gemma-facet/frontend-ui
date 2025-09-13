@@ -30,7 +30,7 @@ const processingModeOptions = [
 		value: "preference" as const,
 		title: "Preference",
 		description:
-			"For preference learning like DPO/RLHF. Includes chosen and rejected responses for the model to learn preferences.",
+			"For preference learning like DPO/ORPO. Includes chosen and rejected responses for the model to learn preferences.",
 	},
 ];
 

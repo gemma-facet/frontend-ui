@@ -101,11 +101,12 @@ export interface HyperparameterConfig {
 
 	// Technical and optimization settings
 	packing: boolean;
+	padding_free: boolean;
 	use_fa2: boolean;
-	max_seq_length?: number;
 	lr_scheduler_type?: string;
 	save_strategy?: string;
 	logging_steps?: number;
+	max_length?: number;
 
 	// PEFT Config
 	lora_rank?: number;
@@ -120,9 +121,8 @@ export interface HyperparameterConfig {
 	adam_beta2?: number;
 	warmup_ratio?: number;
 
-	// DPO-specific hyperparameters
+	// DPO-ORPO-specific hyperparameters
 	beta?: number;
-	max_length?: number;
 }
 
 export interface EvaluationConfig {
@@ -139,7 +139,7 @@ export interface WandbConfig {
 }
 
 export interface ExportConfig {
-	format: "adapter" | "merged";
+	format: "adapter" | "merged" | "full";
 	destination: "gcs" | "hfhub";
 	hf_repo_id?: string;
 	include_gguf?: boolean;
@@ -150,7 +150,7 @@ export interface TrainingConfig {
 	base_model_id: string;
 	provider: "unsloth" | "huggingface";
 	method: "Full" | "LoRA" | "QLoRA";
-	trainer_type: "sft" | "dpo" | "grpo";
+	trainer_type: "sft" | "dpo" | "grpo" | "orpo";
 	modality: "text" | "vision";
 
 	hyperparameters: HyperparameterConfig;
