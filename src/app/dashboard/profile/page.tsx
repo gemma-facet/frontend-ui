@@ -106,7 +106,7 @@ const Profile = () => {
 					</CardHeader>
 					<CardContent className="space-y-2">
 						<Input
-							type="text"
+							type="password"
 							placeholder="Enter your Hugging Face token"
 							value={hfToken}
 							onChange={e => setHfToken(e.target.value)}
@@ -136,7 +136,7 @@ const Profile = () => {
 					</CardHeader>
 					<CardContent className="space-y-2">
 						<Input
-							type="text"
+							type="password"
 							placeholder="Enter your Weights and Biases token"
 							value={wbToken}
 							onChange={e => setWbToken(e.target.value)}

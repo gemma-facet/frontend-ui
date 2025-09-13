@@ -315,7 +315,7 @@ const HFDatasetSelector = () => {
 								</Tooltip>
 							</Label>
 							<Input
-								type="text"
+								type="password"
 								placeholder="Enter a Hugging Face dataset token"
 								value={hfDatasetToken || ""}
 								onChange={e =>
