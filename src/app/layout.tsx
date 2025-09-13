@@ -15,8 +15,9 @@ const interTight = Inter_Tight({
 });
 
 export const metadata: Metadata = {
-	title: "Gemma Finetune",
-	description: "Gemma Finetune is a platform for finetuning Gemma models.",
+	title: "Facet AI",
+	description:
+		"Open-source no-code web platform to fine tune, evaluate, and ship customized Gemma VLM/SLM.",
 };
 
 export default function RootLayout({
