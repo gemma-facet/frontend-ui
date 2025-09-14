@@ -59,10 +59,13 @@ interface UnifiedEvaluationFormProps {
 	usePreTrained?: boolean; // Whether to use -pt instead of -it models
 	initialDatasetId?: string;
 	isComparison?: boolean;
+	isComparisonMaster?: boolean;
 	modelLabel?: string;
 	sharedDatasetId?: string;
 	evaluationMode: "metrics" | "batch_inference";
 	preSelectedSamples?: DatasetSample[];
+	onDatasetChange?: (id: string) => void;
+	onSamplesChange?: (samples: DatasetSample[]) => void;
 }
 
 const TASK_TYPES: { value: TaskType; label: string }[] = [
@@ -104,10 +107,13 @@ export default function UnifiedEvaluationForm({
 	usePreTrained,
 	initialDatasetId,
 	isComparison,
+	isComparisonMaster,
 	modelLabel,
 	sharedDatasetId,
 	evaluationMode,
 	preSelectedSamples,
+	onDatasetChange,
+	onSamplesChange,
 }: UnifiedEvaluationFormProps) {
 	const originalBaseModelId = baseModelId || job?.base_model_id;
 	const effectiveDatasetId =
@@ -156,6 +162,14 @@ export default function UnifiedEvaluationForm({
 	const [selected, setSelected] = useState<DatasetSample[]>(
 		preSelectedSamples || [],
 	);
+
+	useEffect(() => {
+		onDatasetChange?.(dataset);
+	}, [dataset, onDatasetChange]);
+
+	useEffect(() => {
+		onSamplesChange?.(selected);
+	}, [selected, onSamplesChange]);
 
 	function handleMetricToggle(metric: MetricType) {
 		setSelectedMetrics(prev => {
@@ -474,7 +488,7 @@ export default function UnifiedEvaluationForm({
 									className={`flex-1 ${isComparison ? "text-sm h-8" : ""}`}
 								/>
 								{evaluationMode === "batch_inference" &&
-									!isComparison && (
+									(!isComparison || !!isComparisonMaster) && (
 										<Button
 											onClick={fetchSamples}
 											disabled={loading || !dataset}
@@ -621,7 +635,11 @@ export default function UnifiedEvaluationForm({
 										Select Metrics
 									</Label>
 									<div
-										className={`grid gap-2 ${isComparison ? "grid-cols-2" : "grid-cols-3"}`}
+										className={`grid gap-2 ${
+											isComparison
+												? "grid-cols-2"
+												: "grid-cols-3"
+										}`}
 									>
 										{METRIC_TYPES.map(metric => (
 											<div
@@ -653,7 +671,9 @@ export default function UnifiedEvaluationForm({
 							)}
 
 							<div
-								className={`grid gap-4 ${isComparison ? "grid-cols-1" : "grid-cols-2"}`}
+								className={`grid gap-4 ${
+									isComparison ? "grid-cols-1" : "grid-cols-2"
+								}`}
 							>
 								<div className="flex flex-col gap-2">
 									<Label
@@ -705,38 +725,39 @@ export default function UnifiedEvaluationForm({
 						// Batch inference-specific fields
 						<div className="space-y-4">
 							{/* Show dataset samples for selection if not in comparison mode */}
-							{!isComparison && splits.length > 0 && (
-								<div className="flex items-center gap-2">
-									<Label
-										htmlFor={`split-${modelLabel || "single"}`}
-										className="font-semibold"
-									>
-										Split:
-									</Label>
-									<Select
-										value={selectedSplit}
-										onValueChange={handleSplitChange}
-										disabled={loading}
-									>
-										<SelectTrigger className="w-48">
-											<SelectValue />
-										</SelectTrigger>
-										<SelectContent>
-											{splits.map(split => (
-												<SelectItem
-													key={split.split_name}
-													value={split.split_name}
-												>
-													{split.split_name} (
-													{split.num_rows} rows)
-												</SelectItem>
-											))}
-										</SelectContent>
-									</Select>
-								</div>
-							)}
+							{(!isComparison || !!isComparisonMaster) &&
+								splits.length > 0 && (
+									<div className="flex items-center gap-2">
+										<Label
+											htmlFor={`split-${modelLabel || "single"}`}
+											className="font-semibold"
+										>
+											Split:
+										</Label>
+										<Select
+											value={selectedSplit}
+											onValueChange={handleSplitChange}
+											disabled={loading}
+										>
+											<SelectTrigger className="w-48">
+												<SelectValue />
+											</SelectTrigger>
+											<SelectContent>
+												{splits.map(split => (
+													<SelectItem
+														key={split.split_name}
+														value={split.split_name}
+													>
+														{split.split_name} (
+														{split.num_rows} rows)
+													</SelectItem>
+												))}
+											</SelectContent>
+										</Select>
+									</div>
+								)}
 
-							{!isComparison &&
+							{(!isComparison || !!isComparisonMaster) &&
 								splits.length > 0 &&
 								samples.length === 0 && (
 									<div className="p-4 border border-gray-200 rounded text-sm">
@@ -747,63 +768,68 @@ export default function UnifiedEvaluationForm({
 									</div>
 								)}
 
-							{!isComparison && samples.length > 0 && (
-								<div className="space-y-4">
-									<div className="flex justify-between items-center">
-										<Label className="font-semibold">
-											Select Samples for Inference
-										</Label>
-										<span className="text-sm text-muted-foreground">
-											{selected.length} selected
-										</span>
-									</div>
+							{(!isComparison || !!isComparisonMaster) &&
+								samples.length > 0 && (
+									<div className="space-y-4">
+										<div className="flex justify-between items-center">
+											<Label className="font-semibold">
+												Select Samples for Inference
+											</Label>
+											<span className="text-sm text-muted-foreground">
+												{selected.length} selected
+											</span>
+										</div>
 
-									<div className="grid gap-3">
-										{samples.map((sample, idx) => (
-											<button
-												type="button"
-												key={getSampleKey(sample)}
-												className={`p-3 border rounded cursor-pointer transition-colors text-left w-full ${
-													selected.some(
-														s =>
-															getSampleKey(s) ===
-															getSampleKey(
-																sample,
-															),
-													)
-														? "border-primary bg-primary/5"
-														: "border-border hover:border-primary/50"
-												}`}
-												onClick={() =>
-													toggleSampleSelection(
-														sample,
-													)
-												}
-												aria-label={`Toggle selection for sample ${idx + 1}`}
-											>
-												<div className="text-sm">
-													<strong>
-														Sample {idx + 1}:
-													</strong>
-													<div className="mt-2 max-h-32 overflow-y-auto border rounded p-2 bg-muted/20">
-														<MessageDisplay
-															sample={sample}
-															compact={true}
-														/>
+										<div className="grid gap-3">
+											{samples.map((sample, idx) => (
+												<button
+													type="button"
+													key={getSampleKey(sample)}
+													className={`p-3 border rounded cursor-pointer transition-colors text-left w-full ${
+														selected.some(
+															s =>
+																getSampleKey(
+																	s,
+																) ===
+																getSampleKey(
+																	sample,
+																),
+														)
+															? "border-primary bg-primary/5"
+															: "border-border hover:border-primary/50"
+													}`}
+													onClick={() =>
+														toggleSampleSelection(
+															sample,
+														)
+													}
+													aria-label={`Toggle selection for sample ${idx + 1}`}
+												>
+													<div className="text-sm">
+														<strong>
+															Sample {idx + 1}:
+														</strong>
+														<div className="mt-2 max-h-32 overflow-y-auto border rounded p-2 bg-muted/20">
+															<MessageDisplay
+																sample={sample}
+																compact={true}
+															/>
+														</div>
 													</div>
-												</div>
-											</button>
-										))}
+												</button>
+											))}
+										</div>
 									</div>
-								</div>
-							)}
+								)}
 
-							{isComparison && preSelectedSamples && (
-								<div className="text-sm text-muted-foreground bg-muted/50 rounded p-3">
-									Using {preSelectedSamples.length}{" "}
-									pre-selected samples for comparison.
-								</div>
-							)}
+							{isComparison &&
+								!isComparisonMaster &&
+								preSelectedSamples && (
+									<div className="text-sm text-muted-foreground bg-muted/50 rounded p-3">
+										Using {preSelectedSamples.length}{" "}
+										pre-selected samples for comparison.
+									</div>
+								)}
 						</div>
 					)}
 
@@ -824,12 +850,18 @@ export default function UnifiedEvaluationForm({
 						{loading ? (
 							<>
 								<Loader2
-									className={`animate-spin mr-2 ${isComparison ? "w-3 h-3" : "w-4 h-4"}`}
+									className={`animate-spin mr-2 ${
+										isComparison ? "w-3 h-3" : "w-4 h-4"
+									}`}
 								/>
 								Running...
 							</>
 						) : (
-							`Run ${evaluationMode === "metrics" ? "Evaluation" : "Batch Inference"}`
+							`Run ${
+								evaluationMode === "metrics"
+									? "Evaluation"
+									: "Batch Inference"
+							}`
 						)}
 					</Button>
 
@@ -857,7 +889,11 @@ export default function UnifiedEvaluationForm({
 											Metrics
 										</div>
 										<div
-											className={`grid gap-3 ${isComparison ? "grid-cols-1" : "grid-cols-2 md:grid-cols-3"}`}
+											className={`grid gap-3 ${
+												isComparison
+													? "grid-cols-1"
+													: "grid-cols-2 md:grid-cols-3"
+											}`}
 										>
 											{Object.entries(
 												results.metrics,
@@ -867,7 +903,11 @@ export default function UnifiedEvaluationForm({
 													className="p-3 bg-muted/50 rounded border"
 												>
 													<div
-														className={`font-medium capitalize mb-1 ${isComparison ? "text-xs" : "text-sm"}`}
+														className={`font-medium capitalize mb-1 ${
+															isComparison
+																? "text-xs"
+																: "text-sm"
+														}`}
 													>
 														{metric.replace(
 															/_/g,
@@ -875,7 +915,11 @@ export default function UnifiedEvaluationForm({
 														)}
 													</div>
 													<div
-														className={`${isComparison ? "text-xs" : "text-sm"}`}
+														className={`${
+															isComparison
+																? "text-xs"
+																: "text-sm"
+														}`}
 													>
 														{formatMetricValue(
 															value,
