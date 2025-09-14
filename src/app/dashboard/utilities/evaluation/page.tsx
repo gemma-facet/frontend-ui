@@ -9,6 +9,7 @@ import EvaluationModeSelector from "@/components/evaluation-mode-selector";
 import ModelSelector from "@/components/model-selector";
 import { Button } from "@/components/ui/button";
 import UnifiedEvaluationForm from "@/components/unified-evaluation-form";
+import type { DatasetSample } from "@/types/dataset";
 import type { ModelType } from "@/types/inference";
 import type { TrainingJob } from "@/types/training";
 import { useAtom } from "jotai";
@@ -30,6 +31,8 @@ export default function EvaluationsPage() {
 	const [detailedJob1, setDetailedJob1] = useState<TrainingJob | null>(null);
 	const [detailedJob2, setDetailedJob2] = useState<TrainingJob | null>(null);
 	const [fetchingDetails, setFetchingDetails] = useState(false);
+	const [sharedDatasetId, setSharedDatasetId] = useState<string>("");
+	const [sharedSamples, setSharedSamples] = useState<DatasetSample[]>([]);
 
 	const canProceedToStep2 = comparisonModels.isComparison
 		? comparisonModels.model1 !== null && comparisonModels.model2 !== null
@@ -48,24 +51,33 @@ export default function EvaluationsPage() {
 
 		if (model.type === "base") {
 			modelType = "base";
-			// For base models, modelSource should be the same as the constructed base_model_id
-			// This will be constructed in the unified evaluation form
 			modelSource = model.baseModelId || "";
-		} else if (model.type === "trained" && jobDetails?.adapter_path) {
-			// For trained models, we need to determine if user wants adapter or merged model
-			// TODO: This logic should be enhanced to let users choose between adapter/merged
-			// For now, we default to adapter if available, otherwise check for merged path
-			if (jobDetails.adapter_path.includes("merged")) {
+		} else if (model.type === "trained" && jobDetails?.artifacts) {
+			// Prefer merged model if it exists, otherwise use adapter
+			if (jobDetails.artifacts.raw?.merged) {
 				modelType = "merged";
-				modelSource = jobDetails.adapter_path;
-			} else {
+				modelSource = jobDetails.artifacts.raw.merged;
+			} else if (jobDetails.artifacts.raw?.adapter) {
 				modelType = "adapter";
-				modelSource = jobDetails.adapter_path;
+				modelSource = jobDetails.artifacts.raw.adapter;
+			} else {
+				// Fallback if no raw artifacts are found
+				modelType = "adapter";
+				modelSource = ""; // Or some other default
 			}
 		} else {
-			// Fallback for trained models without detailed job info
-			modelType = "adapter";
-			modelSource = model.job?.adapter_path || "";
+			// Fallback for trained models without detailed job info from a fetch
+			const job = model.job;
+			if (job?.artifacts?.raw?.merged) {
+				modelType = "merged";
+				modelSource = job.artifacts.raw.merged;
+			} else if (job?.artifacts?.raw?.adapter) {
+				modelType = "adapter";
+				modelSource = job.artifacts.raw.adapter;
+			} else {
+				modelType = "adapter";
+				modelSource = "";
+			}
 		}
 
 		return {
@@ -115,6 +127,12 @@ export default function EvaluationsPage() {
 					if (model1Details) setDetailedJob1(model1Details);
 					if (model2Details) setDetailedJob2(model2Details);
 					if (model1Details) setDetailedJob(model1Details);
+
+					const model1Config = getModelConfig(
+						comparisonModels.model1,
+						model1Details,
+					);
+					setSharedDatasetId(model1Config?.initialDatasetId || "");
 				} else {
 					if (
 						selectedModel?.type === "trained" &&
@@ -248,12 +266,40 @@ export default function EvaluationsPage() {
 					</>
 				)}
 
-				{step === 3 && selectedMode && (
-					<UnifiedEvaluationForm
-						{...getModelConfig(selectedModel, detailedJob)}
-						evaluationMode={selectedMode}
-					/>
-				)}
+				{step === 3 &&
+					selectedMode &&
+					(comparisonModels.isComparison ? (
+						<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+							<UnifiedEvaluationForm
+								{...getModelConfig(
+									comparisonModels.model1,
+									detailedJob1,
+								)}
+								evaluationMode={selectedMode}
+								isComparison
+								isComparisonMaster
+								modelLabel="Model 1"
+								onDatasetChange={setSharedDatasetId}
+								onSamplesChange={setSharedSamples}
+							/>
+							<UnifiedEvaluationForm
+								{...getModelConfig(
+									comparisonModels.model2,
+									detailedJob2,
+								)}
+								evaluationMode={selectedMode}
+								isComparison
+								modelLabel="Model 2"
+								sharedDatasetId={sharedDatasetId}
+								preSelectedSamples={sharedSamples}
+							/>
+						</div>
+					) : (
+						<UnifiedEvaluationForm
+							{...getModelConfig(selectedModel, detailedJob)}
+							evaluationMode={selectedMode}
+						/>
+					))}
 			</div>
 		</div>
 	);
