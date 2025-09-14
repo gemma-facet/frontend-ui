@@ -111,28 +111,22 @@ export default function JobDetailPage() {
 		}
 	}, [job]);
 
-	async function handleDownload() {
-		if (!job?.gguf_path) return;
+	async function handleDownload(path: string) {
+		if (!path) return;
 
 		setDownloadLoading(true);
 		setDownloadError(null);
 		try {
-			if (job.gguf_path.startsWith("gs://")) {
+			if (path.startsWith("gs://")) {
 				// Convert gs:// URL to public GCS URL
-				// Format: gs://bucket/path -> https://storage.googleapis.com/bucket/path
-				const publicUrl = job.gguf_path.replace(
+				const publicUrl = path.replace(
 					"gs://",
 					"https://storage.googleapis.com/",
 				);
-
-				// Download the file using the public GCS URL
 				window.open(publicUrl, "_blank");
 			} else {
-				// Not a GCS path, treat as HuggingFace repo ID and redirect to HF
-				window.open(
-					`https://huggingface.co/${job.gguf_path}`,
-					"_blank",
-				);
+				// Assume it's a full URL (like HF or public GCS)
+				window.open(path, "_blank");
 			}
 		} catch (err: unknown) {
 			setDownloadError(err instanceof Error ? err.message : String(err));
@@ -190,6 +184,63 @@ export default function JobDetailPage() {
 	if (error) return <div className="p-8 text-red-600">Error: {error}</div>;
 	if (!job) return <div className="p-8">Job not found.</div>;
 
+	type ArtifactDisplayProps = {
+		title: string;
+		path?: string;
+		isLink?: boolean;
+		isDownload?: boolean;
+		downloadPath?: string;
+	};
+
+	const ArtifactDisplay = ({
+		title,
+		path,
+		isLink = false,
+		isDownload = false,
+		downloadPath = "",
+	}: ArtifactDisplayProps) => {
+		if (!path) return null;
+		return (
+			<div>
+				<span className="text-sm font-medium text-muted-foreground">
+					{title}
+				</span>
+				<div className="flex items-center gap-2 mt-1">
+					{isLink ? (
+						<a
+							href={path}
+							target="_blank"
+							rel="noopener noreferrer"
+							className="text-blue-600 hover:text-blue-800 underline text-sm break-all"
+						>
+							{path}
+						</a>
+					) : (
+						<p className="text-sm font-mono bg-muted px-2 py-1 rounded break-all flex-1">
+							{path}
+						</p>
+					)}
+					{isDownload && (
+						<Button
+							size="sm"
+							variant="outline"
+							onClick={() => handleDownload(downloadPath || path)}
+							disabled={downloadLoading}
+							className="flex items-center gap-2 shrink-0"
+						>
+							{downloadLoading ? (
+								<Loader2 className="w-4 h-4 animate-spin" />
+							) : (
+								<Download className="w-4 h-4" />
+							)}
+							Download
+						</Button>
+					)}
+				</div>
+			</div>
+		);
+	};
+
 	return (
 		<div className="max-w-4xl mx-auto py-8 space-y-6">
 			{/* Header */}
@@ -229,19 +280,39 @@ export default function JobDetailPage() {
 						)}
 						{deleteLoading ? "Deleting..." : "Delete Job"}
 					</Button>
-					{job.status === "completed" && job.adapter_path && (
-						<Button
-							variant="default"
-							size="sm"
-							onClick={() => {
-								setSelectedModel({ type: "trained", job });
-								router.push("/dashboard/utilities/evaluation");
-							}}
-							className="flex items-center gap-2"
-						>
-							Evaluate Model
-						</Button>
-					)}
+					{job.status === "completed" &&
+						job.artifacts?.raw?.adapter && (
+							<>
+								<Button
+									variant="default"
+									size="sm"
+									onClick={() => {
+										setSelectedModel({
+											type: "trained",
+											job,
+										});
+										router.push(
+											"/dashboard/utilities/evaluation",
+										);
+									}}
+									className="flex items-center gap-2"
+								>
+									Evaluate Model
+								</Button>
+								<Button
+									variant="outline"
+									size="sm"
+									onClick={() => {
+										router.push(
+											`/dashboard/utilities/export/${jobId}`,
+										);
+									}}
+									className="flex items-center gap-2"
+								>
+									Export Model
+								</Button>
+							</>
+						)}
 				</div>
 			</div>
 
@@ -283,6 +354,7 @@ export default function JobDetailPage() {
 								"Preparing training environment..."}
 							{job.status === "queued" &&
 								"Job queued for processing"}
+							{job.status === "pending" && "Job is pending"}
 						</p>
 					</div>
 				</div>
@@ -352,13 +424,47 @@ export default function JobDetailPage() {
 									</p>
 								</div>
 							)}
+							{job.dataset_id && (
+								<div>
+									<span className="text-sm font-medium text-muted-foreground">
+										Raw Dataset ID
+									</span>
+									<p className="text-sm font-mono bg-muted px-2 py-1 rounded mt-1">
+										{job.dataset_id}
+									</p>
+								</div>
+							)}
 							{job.processed_dataset_id && (
 								<div>
 									<span className="text-sm font-medium text-muted-foreground">
-										Dataset
+										Processed Dataset ID
 									</span>
 									<p className="text-sm font-mono bg-muted px-2 py-1 rounded mt-1">
 										{job.processed_dataset_id}
+									</p>
+								</div>
+							)}
+							{job.created_at && (
+								<div>
+									<span className="text-sm font-medium text-muted-foreground">
+										Created At
+									</span>
+									<p className="mt-1">
+										{new Date(
+											job.created_at,
+										).toLocaleString()}
+									</p>
+								</div>
+							)}
+							{job.updated_at && (
+								<div>
+									<span className="text-sm font-medium text-muted-foreground">
+										Last Updated
+									</span>
+									<p className="mt-1">
+										{new Date(
+											job.updated_at,
+										).toLocaleString()}
 									</p>
 								</div>
 							)}
@@ -375,53 +481,45 @@ export default function JobDetailPage() {
 					</CardHeader>
 					<CardContent className="space-y-4">
 						<div className="space-y-3">
-							{job.adapter_path && (
-								<div>
-									<span className="text-sm font-medium text-muted-foreground">
-										Adapter Path
-									</span>
-									<p className="text-sm font-mono bg-muted px-2 py-1 rounded mt-1 break-all">
-										{job.adapter_path}
-									</p>
-								</div>
-							)}
-							{job.gguf_path && (
-								<div>
-									<span className="text-sm font-medium text-muted-foreground">
-										GGUF Model
-									</span>
-									<div className="flex items-center gap-2 mt-1">
-										<p className="text-sm font-mono bg-muted px-2 py-1 rounded break-all flex-1">
-											{job.gguf_path}
-										</p>
-										<Button
-											size="sm"
-											variant="outline"
-											onClick={handleDownload}
-											disabled={downloadLoading}
-											className="flex items-center gap-2 shrink-0"
-										>
-											{downloadLoading ? (
-												<Loader2 className="w-4 h-4 animate-spin" />
-											) : (
-												<Download className="w-4 h-4" />
-											)}
-											{downloadLoading
-												? "Getting..."
-												: job.gguf_path.startsWith(
-															"gs://",
-														)
-													? "Download"
-													: "View on HF"}
-										</Button>
-									</div>
-									{downloadError && (
-										<div className="text-red-600 text-xs mt-1 p-2 bg-red-50 rounded border border-red-200">
-											{downloadError}
-										</div>
-									)}
-								</div>
-							)}
+							<ArtifactDisplay
+								title="Raw Adapter Path"
+								path={job.artifacts?.raw?.adapter}
+							/>
+							<ArtifactDisplay
+								title="Raw Merged Path"
+								path={job.artifacts?.raw?.merged}
+							/>
+							<ArtifactDisplay
+								title="Adapter File"
+								path={job.artifacts?.file?.adapter}
+								isDownload
+							/>
+							<ArtifactDisplay
+								title="Merged File"
+								path={job.artifacts?.file?.merged}
+								isDownload
+							/>
+							<ArtifactDisplay
+								title="GGUF File"
+								path={job.artifacts?.file?.gguf}
+								isDownload
+							/>
+							<ArtifactDisplay
+								title="Hugging Face Adapter"
+								path={job.artifacts?.hf?.adapter}
+								isLink
+							/>
+							<ArtifactDisplay
+								title="Hugging Face Merged"
+								path={job.artifacts?.hf?.merged}
+								isLink
+							/>
+							<ArtifactDisplay
+								title="Hugging Face GGUF"
+								path={job.artifacts?.hf?.gguf}
+								isLink
+							/>
+
 							{job.wandb_url && (
 								<div>
 									<span className="text-sm font-medium text-muted-foreground">

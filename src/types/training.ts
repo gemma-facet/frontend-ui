@@ -1,3 +1,5 @@
+import type { JobArtifacts } from "./export";
+
 export interface EvaluationMetrics {
 	accuracy?: number;
 	perplexity?: number;
@@ -170,13 +172,21 @@ export interface TrainRequest {
 export interface TrainingJob {
 	job_id: string;
 	job_name?: string;
-	status?: "queued" | "preparing" | "training" | "completed" | "failed";
+	user_id?: string;
+	status?:
+		| "pending"
+		| "queued"
+		| "preparing"
+		| "training"
+		| "completed"
+		| "failed";
 	processed_dataset_id?: string;
+	dataset_id?: string;
 	base_model_id?: string;
 	created_at?: string;
+	updated_at?: string;
 	wandb_url?: string;
-	adapter_path?: string;
-	gguf_path?: string;
+	artifacts?: JobArtifacts;
 	error?: string;
 	modality?: "text" | "vision";
 	metrics?: EvaluationMetrics;
