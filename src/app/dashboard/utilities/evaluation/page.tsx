@@ -53,13 +53,13 @@ export default function EvaluationsPage() {
 			modelType = "base";
 			modelSource = model.baseModelId || "";
 		} else if (model.type === "trained" && jobDetails?.artifacts) {
-			// Prefer merged model if it exists, otherwise use adapter
-			if (jobDetails.artifacts.raw?.merged) {
-				modelType = "merged";
-				modelSource = jobDetails.artifacts.raw.merged;
-			} else if (jobDetails.artifacts.raw?.adapter) {
+			// Prefer adapter since all models have it, otherwise use merged
+			if (jobDetails.artifacts.raw?.adapter) {
 				modelType = "adapter";
 				modelSource = jobDetails.artifacts.raw.adapter;
+			} else if (jobDetails.artifacts.raw?.merged) {
+				modelType = "merged";
+				modelSource = jobDetails.artifacts.raw.merged;
 			} else {
 				// Fallback if no raw artifacts are found
 				modelType = "adapter";
@@ -68,12 +68,12 @@ export default function EvaluationsPage() {
 		} else {
 			// Fallback for trained models without detailed job info from a fetch
 			const job = model.job;
-			if (job?.artifacts?.raw?.merged) {
-				modelType = "merged";
-				modelSource = job.artifacts.raw.merged;
-			} else if (job?.artifacts?.raw?.adapter) {
+			if (job?.artifacts?.raw?.adapter) {
 				modelType = "adapter";
 				modelSource = job.artifacts.raw.adapter;
+			} else if (job?.artifacts?.raw?.merged) {
+				modelType = "merged";
+				modelSource = job.artifacts.raw.merged;
 			} else {
 				modelType = "adapter";
 				modelSource = "";
@@ -199,7 +199,13 @@ export default function EvaluationsPage() {
 				{steps.map((stepInfo, index) => (
 					<div key={stepInfo.number} className="flex items-center">
 						<div
-							className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-medium ${step === stepInfo.number ? "bg-primary text-primary-foreground" : stepInfo.completed ? "bg-green-100 text-green-600" : "bg-muted text-muted-foreground"}`}
+							className={`flex items-center justify-center w-8 h-8 rounded-full text-sm font-medium ${
+								step === stepInfo.number
+									? "bg-primary text-primary-foreground"
+									: stepInfo.completed
+										? "bg-green-100 text-green-600"
+										: "bg-muted text-muted-foreground"
+							}`}
 						>
 							{stepInfo.completed ? (
 								<CheckCircle2 className="w-5 h-5" />
@@ -208,7 +214,13 @@ export default function EvaluationsPage() {
 							)}
 						</div>
 						<span
-							className={`ml-2 text-sm ${step === stepInfo.number ? "font-medium text-foreground" : stepInfo.completed ? "text-green-600" : "text-muted-foreground"}`}
+							className={`ml-2 text-sm ${
+								step === stepInfo.number
+									? "font-medium text-foreground"
+									: stepInfo.completed
+										? "text-green-600"
+										: "text-muted-foreground"
+							}`}
 						>
 							{stepInfo.title}
 						</span>
