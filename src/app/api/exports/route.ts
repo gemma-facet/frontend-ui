@@ -1,23 +1,23 @@
-import type { ExportRequest, ExportResponse, JobSchema } from "@/types/export";
+import type {
+	ExportJobListEntry,
+	ExportRequest,
+	ExportResponse,
+} from "@/types/export";
 import { NextResponse } from "next/server";
-import { EXPORT_SERVICE_URL } from "../env";
+import { API_GATEWAY_URL } from "../env";
 import { backendFetch } from "../utils";
 
 export async function GET(request: Request) {
 	try {
-		const res = await backendFetch(
-			request,
-			`${EXPORT_SERVICE_URL}/exports`,
-			{
-				method: "GET",
-				headers: { "Content-Type": "application/json" },
-			},
-		);
+		const res = await backendFetch(request, `${API_GATEWAY_URL}/exports`, {
+			method: "GET",
+			headers: { "Content-Type": "application/json" },
+		});
 
 		const data = await res.json();
 		if (!res.ok)
 			throw new Error(data.error || "Failed to fetch export jobs");
-		return NextResponse.json(data as JobSchema[]);
+		return NextResponse.json(data as ExportJobListEntry[]);
 	} catch (err: unknown) {
 		return NextResponse.json(
 			{ error: err instanceof Error ? err.message : String(err) },
@@ -54,7 +54,9 @@ export async function POST(request: Request) {
 		if (invaliddestination.length > 0) {
 			return NextResponse.json(
 				{
-					error: `Invalid destination: ${invaliddestination.join(", ")}. Valid destination are: gcs, hf_hub`,
+					error: `Invalid destination: ${invaliddestination.join(
+						", ",
+					)}. Valid destination are: gcs, hf_hub`,
 				},
 				{ status: 400 },
 			);
@@ -82,12 +84,11 @@ export async function POST(request: Request) {
 
 		const res = await backendFetch(
 			request,
-			`${EXPORT_SERVICE_URL}/exports`,
+			`${API_GATEWAY_URL}/jobs/${job_id}/export`,
 			{
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify({
-					job_id,
 					export_type,
 					destination,
 					hf_token,
