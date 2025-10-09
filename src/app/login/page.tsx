@@ -20,19 +20,13 @@ export default function LoginPage() {
 	const [email, setEmail] = useState("");
 	const [password, setPassword] = useState("");
 	const [error, setError] = useState<string | null>(null);
-	const [loading, setLoading] = useState(true);
 	const [mode, setMode] = useState<"login" | "signup">("login");
 
 	useEffect(() => {
-		getRedirectResult(auth)
-			.then(result => {
-				// Let AuthProvider handle the redirect
-				setLoading(false);
-			})
-			.catch(error => {
-				setError(error.message);
-				setLoading(false);
-			});
+		// Handle redirect result from Google Sign-in if present
+		getRedirectResult(auth).catch(error => {
+			setError(error.message);
+		});
 	}, []);
 
 	const handleAuthSubmit = async (e: React.FormEvent) => {
@@ -88,14 +82,6 @@ export default function LoginPage() {
 			}
 		}
 	};
-
-	if (loading) {
-		return (
-			<div className="flex items-center justify-center min-h-screen bg-gray-900 text-white">
-				Loading...
-			</div>
-		);
-	}
 
 	return (
 		<div className="flex items-center justify-center min-h-screen bg-gray-900 text-white">

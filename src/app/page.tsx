@@ -1,5 +1,6 @@
 "use client";
 
+import { useAuth } from "@/components/auth-provider";
 import { Button } from "@/components/ui/button";
 import {
 	BrainCircuit,
@@ -12,6 +13,8 @@ import {
 import Link from "next/link";
 
 export default function HomePage() {
+	const { user, loading } = useAuth();
+
 	return (
 		<div className="flex flex-col min-h-screen bg-gray-900 text-white">
 			<main className="flex-1">
@@ -29,7 +32,7 @@ export default function HomePage() {
 								</p>
 							</div>
 							<div className="space-x-4">
-								<Link href="/login">
+								<Link href={user ? "/dashboard" : "/login"}>
 									<Button
 										size="lg"
 										className="bg-indigo-600 hover:bg-indigo-700"
