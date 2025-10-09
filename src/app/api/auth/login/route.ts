@@ -14,7 +14,8 @@ export async function POST(request: Request) {
 		response.cookies.set("firebaseIdToken", token, {
 			httpOnly: true,
 			secure: process.env.NODE_ENV !== "development",
-			maxAge: 60 * 60 * 24 * 7, // 1 week
+			maxAge: 60 * 60, // 1 hour to match Firebase token expiration
+			sameSite: "lax",
 			path: "/",
 		});
 

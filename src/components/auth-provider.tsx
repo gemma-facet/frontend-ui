@@ -2,7 +2,7 @@
 
 import { auth } from "@/lib/firebase";
 import { type User, onAuthStateChanged } from "firebase/auth";
-import { usePathname, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import {
 	type ReactNode,
 	createContext,
@@ -25,15 +25,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 	const [user, setUser] = useState<User | null>(null);
 	const [loading, setLoading] = useState(true);
 	const router = useRouter();
-	const pathname = usePathname();
 
 	useEffect(() => {
 		const unsubscribe = onAuthStateChanged(auth, async user => {
-			const previousUser = user;
 			setUser(user);
 
 			try {
 				if (user) {
+					// this automatically refreshes the token and updates the cookie
 					const token = await user.getIdToken();
 					await fetch("/api/auth/login", {
 						method: "POST",
@@ -42,15 +41,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 					});
 
 					// Redirect to dashboard if user just logged in and is on login page
-					if (pathname === "/login" || pathname === "/") {
+					if (
+						typeof window !== "undefined" &&
+						window.location.pathname === "/login"
+					) {
+						// router.refresh();
 						router.push("/dashboard");
+						// window.location.href = "/dashboard";
 					}
 				} else {
+					console.log("[AuthProvider] Calling logout API...");
 					await fetch("/api/auth/logout", { method: "POST" });
 
 					// Redirect to login if user just logged out and is on a protected route
-					if (pathname.startsWith("/dashboard")) {
+					if (
+						typeof window !== "undefined" &&
+						window.location.pathname.startsWith("/dashboard")
+					) {
+						// router.refresh();
 						router.push("/login");
+						// window.location.href = "/login";
 					}
 				}
 			} catch (error) {
@@ -61,7 +71,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 		});
 
 		return () => unsubscribe();
-	}, [router, pathname]);
+	}, [router]);
 
 	return (
 		<AuthContext.Provider value={{ user, loading }}>

@@ -113,7 +113,7 @@ export function AppSidebar() {
 				</div>
 				<div className="flex flex-col gap-0.5 leading-none">
 					<span className="font-semibold font-title">Facet AI</span>
-					<span className="text-xs">v0</span>
+					<span className="text-xs">v0.0.1-beta</span>
 				</div>
 			</SidebarHeader>
 			<SidebarContent>

@@ -68,7 +68,7 @@ export default function ExportJobDetailPage() {
 			setError(null);
 
 			try {
-				const response = await fetch(`/api/exports/${jobId}`);
+				const response = await fetch(`/api/jobs/${jobId}`);
 				if (!response.ok) {
 					throw new Error("Failed to fetch export job");
 				}
@@ -87,14 +87,13 @@ export default function ExportJobDetailPage() {
 
 	const fetchJobStatus = useCallback(async () => {
 		try {
-			const response = await fetch(`/api/exports/${jobId}`);
+			const response = await fetch(`/api/jobs/${jobId}`);
 			if (!response.ok) {
 				throw new Error("Failed to fetch export job");
 			}
 
 			const data: GetExportResponse = await response.json();
 			setJob(data);
-			console.log(data);
 
 			// If latest_export status is running, schedule next poll in 10 seconds
 			if (data.latest_export?.status === "running") {
@@ -141,14 +140,13 @@ export default function ExportJobDetailPage() {
 
 		try {
 			const payload = {
-				job_id: job.job_id,
 				export_type: selectedExportType,
 				destination,
 				hf_token: hfToken,
 				hf_repo_id: hfRepoId,
 			};
 
-			const response = await fetch("/api/exports", {
+			const response = await fetch(`/api/jobs/${jobId}/export`, {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify(payload),
@@ -339,7 +337,7 @@ export default function ExportJobDetailPage() {
 							Job ID
 						</p>
 						<p className="text-sm font-mono bg-muted px-2 py-1 rounded">
-							{job.job_id}
+							{jobId}
 						</p>
 					</div>
 				</CardContent>

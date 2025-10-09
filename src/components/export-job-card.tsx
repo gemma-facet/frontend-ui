@@ -8,11 +8,11 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
-import type { JobSchema } from "@/types/export";
+import type { ExportJobListEntry } from "@/types/export";
 import Link from "next/link";
 
 export type ExportJobCardProps = {
-	job: JobSchema;
+	job: ExportJobListEntry;
 };
 
 export default function ExportJobCard({ job }: ExportJobCardProps) {

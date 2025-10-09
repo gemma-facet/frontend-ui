@@ -72,3 +72,14 @@ export interface ExportResponse {
 	message: string;
 	export_id: string;
 }
+
+export interface ExportJobListEntry {
+	job_id: string;
+	job_name: string;
+	base_model_id: string;
+	artifacts?: JobArtifacts;
+}
+
+export interface ListExportsResponse {
+	jobs: ExportJobListEntry[];
+}
