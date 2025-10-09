@@ -3,12 +3,12 @@
 import ExportJobCard from "@/components/export-job-card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import type { JobSchema } from "@/types/export";
+import type { ExportJobListEntry } from "@/types/export";
 import { Loader2, RefreshCcw } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
 const ExportPage = () => {
-	const [jobs, setJobs] = useState<JobSchema[]>([]);
+	const [jobs, setJobs] = useState<ExportJobListEntry[]>([]);
 	const [loading, setLoading] = useState(false);
 	const [error, setError] = useState<string | null>(null);
 
@@ -22,7 +22,7 @@ const ExportPage = () => {
 				throw new Error("Failed to fetch export jobs");
 			}
 
-			const data: JobSchema[] = await response.json();
+			const data: ExportJobListEntry[] = await response.json();
 			setJobs(data);
 		} catch (err: unknown) {
 			setError(err instanceof Error ? err.message : "Unknown error");

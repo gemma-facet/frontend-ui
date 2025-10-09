@@ -7,12 +7,13 @@ import { auth } from "@/lib/firebase";
 import {
 	GoogleAuthProvider,
 	createUserWithEmailAndPassword,
-	getAuth,
 	getRedirectResult,
 	signInWithEmailAndPassword,
 	signInWithPopup,
 	validatePassword,
 } from "firebase/auth";
+import { Gem } from "lucide-react";
+import Link from "next/link";
 import { useEffect, useState } from "react";
 
 export default function LoginPage() {
@@ -97,14 +98,20 @@ export default function LoginPage() {
 	}
 
 	return (
-		<div className="flex items-center justify-center min-h-screen bg-gray-900">
-			<div className="w-full max-w-md p-8 space-y-6 bg-gray-800 rounded-lg shadow-md">
-				<h1 className="text-2xl font-bold text-center text-white">
-					{mode === "signup" ? "Sign Up" : "Login"}
+		<div className="flex items-center justify-center min-h-screen bg-gray-900 text-white">
+			<div className="mx-auto w-full max-w-md rounded-lg bg-gray-800/50 shadow-xl p-8 border border-gray-700">
+				<div className="flex justify-center mb-6">
+					<Link href="/" className="flex items-center gap-2">
+						<Gem className="h-6 w-6 text-indigo-400" />
+						<span className="text-xl font-bold">Facet AI</span>
+					</Link>
+				</div>
+				<h1 className="text-2xl font-bold text-center">
+					{mode === "signup" ? "Create an Account" : "Welcome Back"}
 				</h1>
-				<form onSubmit={handleAuthSubmit} className="space-y-6">
+				<form onSubmit={handleAuthSubmit} className="space-y-6 mt-6">
 					<div>
-						<Label htmlFor="email" className="text-gray-300">
+						<Label htmlFor="email" className="text-gray-400">
 							Email
 						</Label>
 						<Input
@@ -113,11 +120,12 @@ export default function LoginPage() {
 							value={email}
 							onChange={e => setEmail(e.target.value)}
 							required
-							className="bg-gray-700 border-gray-600 text-white"
+							className="bg-gray-900 border-gray-700 focus:ring-indigo-500"
+							placeholder="name@example.com"
 						/>
 					</div>
 					<div>
-						<Label htmlFor="password" className="text-gray-300">
+						<Label htmlFor="password" className="text-gray-400">
 							Password
 						</Label>
 						<Input
@@ -126,7 +134,8 @@ export default function LoginPage() {
 							value={password}
 							onChange={e => setPassword(e.target.value)}
 							required
-							className="bg-gray-700 border-gray-600 text-white"
+							className="bg-gray-900 border-gray-700 focus:ring-indigo-500"
+							placeholder="••••••••"
 						/>
 					</div>
 					<Button
@@ -136,9 +145,9 @@ export default function LoginPage() {
 						{mode === "signup" ? "Sign Up" : "Login"}
 					</Button>
 				</form>
-				<div className="relative">
+				<div className="relative my-6">
 					<div className="absolute inset-0 flex items-center">
-						<span className="w-full border-t border-gray-600" />
+						<span className="w-full border-t border-gray-700" />
 					</div>
 					<div className="relative flex justify-center text-xs uppercase">
 						<span className="px-2 bg-gray-800 text-gray-400">
@@ -148,12 +157,12 @@ export default function LoginPage() {
 				</div>
 				<Button
 					variant="outline"
-					className="w-full text-white border-gray-600 hover:bg-gray-700"
+					className="w-full border-gray-600 hover:bg-gray-700"
 					onClick={handleGoogleSignIn}
 				>
 					Sign in with Google
 				</Button>
-				<p className="mt-4 text-sm text-center text-gray-400">
+				<p className="mt-6 text-base text-center text-gray-400">
 					{mode === "signup"
 						? "Already have an account? "
 						: "Don't have an account? "}
@@ -162,13 +171,13 @@ export default function LoginPage() {
 						onClick={() =>
 							setMode(mode === "signup" ? "login" : "signup")
 						}
-						className="font-medium text-indigo-400 hover:text-indigo-500"
+						className="font-medium text-indigo-400 hover:text-indigo-300"
 					>
 						{mode === "signup" ? "Login" : "Sign Up"}
 					</button>
 				</p>
 				{error && (
-					<p className="mt-4 text-sm text-center text-red-500">
+					<p className="mt-4 text-base text-center text-red-400">
 						{error}
 					</p>
 				)}
