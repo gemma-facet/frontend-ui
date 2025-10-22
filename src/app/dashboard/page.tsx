@@ -15,7 +15,7 @@ const Dashboard = () => {
 			<div>
 				<h1 className="text-3xl font-bold">Dashboard</h1>
 				<p className="text-muted-foreground mt-2">
-					Fine-tune SOTA open VLM with only a few clicks.
+					Craft your own facet of Gemma
 				</p>
 			</div>
 			<DatasetsSection />

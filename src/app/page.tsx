@@ -41,7 +41,7 @@ export default function HomePage() {
 									</Button>
 								</Link>
 								<Link
-									href="https://github.com/gemma-facet"
+									href="https://facetai.mintlify.app"
 									target="_blank"
 								>
 									<Button
@@ -50,6 +50,18 @@ export default function HomePage() {
 										className="border-gray-600 hover:bg-gray-800"
 									>
 										Learn More
+									</Button>
+								</Link>
+								<Link
+									href="https://github.com/gemma-facet"
+									target="_blank"
+								>
+									<Button
+										size="lg"
+										variant="outline"
+										className="border-gray-600 hover:bg-gray-800"
+									>
+										GitHub
 									</Button>
 								</Link>
 							</div>

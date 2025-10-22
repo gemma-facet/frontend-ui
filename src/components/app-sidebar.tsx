@@ -17,7 +17,7 @@ import {
 import { auth } from "@/lib/firebase";
 import { signOut } from "firebase/auth";
 import { useAtom } from "jotai";
-import { Download, LogOut, User as UserIcon } from "lucide-react";
+import { Book, Download, LogOut, User as UserIcon } from "lucide-react";
 import {
 	BarChart3,
 	Component,
@@ -30,7 +30,6 @@ import {
 	Settings,
 	SlidersHorizontal,
 	Sparkles,
-	Zap,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -131,7 +130,21 @@ export function AppSidebar() {
 						<SidebarMenuItem>
 							<SidebarMenuButton asChild>
 								<Link
-									href="https://github.com/gemma-fine-tuning"
+									href="https://facetai.mintlify.app"
+									target="_blank"
+									rel="noopener noreferrer"
+									className="flex items-center justify-between"
+								>
+									<span className="flex items-center gap-1">
+										<Book size={16} />
+										Docs
+									</span>
+									<ExternalLink />
+								</Link>
+							</SidebarMenuButton>
+							<SidebarMenuButton asChild>
+								<Link
+									href="https://github.com/gemma-facet"
 									target="_blank"
 									rel="noopener noreferrer"
 									className="flex items-center justify-between"
