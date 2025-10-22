@@ -14,9 +14,7 @@ If you wish to run this locally or deploy on your own infrastructure, first foll
    cp .env.example .env
    ```
 
-   You will need to copy the `API_GATEWAY_URL` and `INFERENCE_SERVICE_URL` from the deployment outputs. Then, login to your Firebase console and copy the Firebase config variables (the setup is done by Terraform already).
-
-   Lastly, if you are using staging, you can also set `API_GATEWAY_URL_STAGING` and `INFERENCE_SERVICE_URL_STAGING` to point to the staging versions of the services.
+   Copy values from `make output ENV=production` command output in `gemma-facet/cloud-services` to the corresponding variables in `.env`. This includes API endpoints and Firebase configuration.
 
 3. Run locally or deploy
 
@@ -28,3 +26,10 @@ If you wish to run this locally or deploy on your own infrastructure, first foll
    ```
 
    Note that when running locally, by default it will point to staging services if available. You can change this in `.env`.
+
+   ```bash
+   bun build
+   bun start
+   ```
+
+   This will build and start the application in production mode.
