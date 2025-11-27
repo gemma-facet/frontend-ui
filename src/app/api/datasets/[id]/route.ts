@@ -41,15 +41,9 @@ export async function DELETE(
 		const { id } = await context.params;
 		const url = `${API_GATEWAY_URL}/datasets/${id}`;
 
-		console.log("DELETE request to:", url);
-		console.log("Dataset ID:", id);
-
 		const response = await backendFetch(request, url, {
 			method: "DELETE",
 		});
-
-		console.log("Response status:", response.status);
-		console.log("Response ok:", response.ok);
 
 		if (!response.ok) {
 			const errorData = await response.json();

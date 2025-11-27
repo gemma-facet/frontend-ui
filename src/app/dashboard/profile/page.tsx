@@ -1,6 +1,7 @@
 "use client";
 
 import {
+	geminiApiKeyAtom,
 	hfDatasetTokenAtom,
 	trainingConfigAtom,
 	trainingHfTokenAtom,
@@ -27,6 +28,7 @@ const Profile = () => {
 
 	const [hfToken, setHfToken] = useState("");
 	const [wbToken, setWbToken] = useState("");
+	const [geminiApiKey, setGeminiApiKey] = useAtom(geminiApiKeyAtom);
 
 	const [trainingHfToken, setTrainingHfToken] = useAtom(trainingHfTokenAtom);
 	const [hfDatasetToken, setHfDatasetToken] = useAtom(hfDatasetTokenAtom);
@@ -36,13 +38,19 @@ const Profile = () => {
 	useEffect(() => {
 		const hfToken = localStorage.getItem("hfToken");
 		const wbToken = localStorage.getItem("wbToken");
+		const geminiKey = localStorage.getItem("geminiApiKey");
 		setHfToken(hfToken || "");
 		setWbToken(wbToken || "");
-	}, []);
+		if (geminiKey) {
+			setGeminiApiKey(geminiKey);
+		}
+	}, [setGeminiApiKey]);
 
 	const handleLogout = async () => {
 		localStorage.removeItem("hfToken");
 		localStorage.removeItem("wbToken");
+		localStorage.removeItem("geminiApiKey");
+		setGeminiApiKey(null);
 		await signOut(auth);
 		// Let AuthProvider handle the redirect
 	};
@@ -75,6 +83,17 @@ const Profile = () => {
 		setWbToken("");
 		setConfig(prev => (prev ? { ...prev, wandb_config: undefined } : null));
 		toast.success("Weights and Biases token cleared");
+	};
+
+	const handleUpdateGeminiKey = async () => {
+		localStorage.setItem("geminiApiKey", geminiApiKey || "");
+		toast.success("Gemini API key updated");
+	};
+
+	const handleClearGeminiKey = async () => {
+		localStorage.removeItem("geminiApiKey");
+		setGeminiApiKey(null);
+		toast.success("Gemini API key cleared");
 	};
 
 	return (
@@ -150,6 +169,36 @@ const Profile = () => {
 								variant="outline"
 							>
 								Clear Token
+							</Button>
+						</div>
+					</CardContent>
+				</Card>
+				<Card>
+					<CardHeader>
+						<CardTitle>Gemini API Key</CardTitle>
+						<CardDescription>
+							Enter your Google Gemini API key to save it in your
+							browser for autofill. It's never stored in the cloud
+							or our database. Used for dataset synthesis and
+							augmentation.
+						</CardDescription>
+					</CardHeader>
+					<CardContent className="space-y-2">
+						<Input
+							type="password"
+							placeholder="Enter your Gemini API key"
+							value={geminiApiKey || ""}
+							onChange={e => setGeminiApiKey(e.target.value)}
+						/>
+						<div className="flex gap-2">
+							<Button onClick={handleUpdateGeminiKey}>
+								Update Gemini Key <KeyRound />
+							</Button>
+							<Button
+								onClick={handleClearGeminiKey}
+								variant="outline"
+							>
+								Clear Key
 							</Button>
 						</div>
 					</CardContent>

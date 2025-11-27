@@ -53,7 +53,7 @@ export const localDatasetSizeAtom = atom<number>(0);
 
 // Final state for configuration
 export type DatasetSelectionType = {
-	type: "huggingface" | "local";
+	type: "huggingface" | "local" | "synthesize";
 	datasetId: string;
 	split?: string;
 	availableSplits?: HFDatasetSplit[];
@@ -63,6 +63,24 @@ export type DatasetSelectionType = {
 	modality?: "text" | "vision";
 };
 export const datasetSelectionAtom = atom<DatasetSelectionType | null>(null);
+
+// Synthesis Dataset
+export const synthesisFileAtom = atom<File | null>(null);
+export const synthesisConfigAtom = atom({
+	dataset_name: "",
+	multimodal: false,
+	num_pairs: 5,
+	temperature: 0.7,
+	chunk_size: 4000,
+	chunk_overlap: 200,
+	threshold: 7.0,
+	batch_size: 5,
+});
+export const synthesisPreviewLoadingAtom = atom(false);
+export const synthesisDatasetIdAtom = atom("");
+export const synthesisColumnsAtom = atom<string[]>([]);
+export const synthesisPreviewRowsAtom = atom<DatasetPreviewRow[]>([]);
+export const synthesisSizeAtom = atom<number>(0);
 /* ********** Dataset Selection Atoms ********** */
 
 /* ********** Dataset Configuration Atoms ********** */
@@ -147,11 +165,14 @@ export const augmentationEDAAtom = atom<boolean>(false);
 export const augmentationBackTranslationAtom = atom<boolean>(false);
 export const augmentationParaphrasingAtom = atom<boolean>(false);
 export const augmentationSynthesisAtom = atom<boolean>(false);
-export const augmentationGeminiApiKeyAtom = atom<string | null>(null);
 export const augmentationSynthesisRatioAtom = atom<number | null>(null);
 export const augmentationCustomPromptAtom = atom<string | null>(null);
 
 export const datasetProcessingLoadingAtom = atom(false);
+
+/* ********** Global API Keys Atoms ********** */
+// Standardized Gemini API key atom for reuse across the app (synthesis, augmentation, etc.)
+export const geminiApiKeyAtom = atom<string | null>(null);
 
 /* ********** Dataset Configuration Atoms ********** */
 
