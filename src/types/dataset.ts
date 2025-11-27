@@ -99,3 +99,30 @@ export interface DatasetDeleteResponse {
 	deleted_files_count?: number;
 	deleted_resources?: string[];
 }
+
+export interface RawDatasetInfo {
+	dataset_id: string;
+	filename: string;
+}
+
+export interface RawDatasetsResponse {
+	datasets: RawDatasetInfo[];
+}
+
+export interface SynthesisConfig {
+	/**Configuration for dataset synthesis using synthetic-data-kit */
+
+	// Dataset metadata
+	dataset_name: string; // Name of the dataset (compulsory)
+	multimodal?: boolean; // Whether to include multimodal data
+
+	// Generation parameters
+	num_pairs?: number; // Number of QA pairs to generate per chunk
+	temperature?: number; // LLM temperature (0.0-1.0)
+	chunk_size?: number; // Size of text chunks for processing
+	chunk_overlap?: number; // Overlap between chunks
+
+	// Curation parameters
+	threshold?: number; // Quality threshold for curation (1-10)
+	batch_size?: number; // Number of items per batch for rating
+}

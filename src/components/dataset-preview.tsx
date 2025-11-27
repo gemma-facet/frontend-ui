@@ -19,6 +19,11 @@ import Image from "next/image";
 const DatasetPreview = ({
 	rows,
 }: { rows: { row: Record<string, unknown> }[] }) => {
+	// Don't show preview if there are no rows
+	if (!rows || rows.length === 0) {
+		return null;
+	}
+
 	return (
 		<Card>
 			<CardHeader>

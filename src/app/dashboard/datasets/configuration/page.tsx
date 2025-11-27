@@ -1,7 +1,6 @@
 "use client";
 
 import {
-	ProcessingMode,
 	additionalFieldMappingsAtom,
 	assistantMessageColumnAtom,
 	assistantMessageMappingAtom,
@@ -11,7 +10,6 @@ import {
 	augmentationCustomPromptAtom,
 	augmentationEDAAtom,
 	augmentationFactorAtom,
-	augmentationGeminiApiKeyAtom,
 	augmentationParaphrasingAtom,
 	augmentationSynthesisAtom,
 	augmentationSynthesisRatioAtom,
@@ -24,6 +22,7 @@ import {
 	datasetProcessingLoadingAtom,
 	datasetSelectionAtom,
 	datasetsAtom,
+	geminiApiKeyAtom,
 	processingModeAtom,
 	rejectedFieldColumnAtom,
 	rejectedFieldTabAtom,
@@ -172,9 +171,8 @@ const DatasetConfiguration = () => {
 	const [augmentationSynthesis, setAugmentationSynthesis] = useAtom(
 		augmentationSynthesisAtom,
 	);
-	const [augmentationGeminiApiKey, setAugmentationGeminiApiKey] = useAtom(
-		augmentationGeminiApiKeyAtom,
-	);
+	const [augmentationGeminiApiKey, setAugmentationGeminiApiKey] =
+		useAtom(geminiApiKeyAtom);
 	const [augmentationSynthesisRatio, setAugmentationSynthesisRatio] = useAtom(
 		augmentationSynthesisRatioAtom,
 	);
@@ -467,8 +465,6 @@ const DatasetConfiguration = () => {
 					`Failed to process dataset: ${data.detail || "Unknown error"}`,
 				);
 			}
-
-			console.log(data);
 
 			// Update the datasets list in the sidebar with the new dataset info
 			if (data.dataset_name) {

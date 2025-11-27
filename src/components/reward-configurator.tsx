@@ -1,6 +1,6 @@
 "use client";
 
-import { trainingConfigAtom } from "@/atoms";
+import { geminiApiKeyAtom, trainingConfigAtom } from "@/atoms";
 import type {
 	AnyGraderConfig,
 	BuiltInRewardConfig,
@@ -45,6 +45,7 @@ const GraderConfigCard = ({
 	index,
 	onUpdate,
 	onRemove,
+	defaultGeminiApiKey,
 }: {
 	grader: AnyGraderConfig;
 	index: number;
@@ -53,6 +54,7 @@ const GraderConfigCard = ({
 		updateFn: (g: AnyGraderConfig) => AnyGraderConfig,
 	) => void;
 	onRemove: (index: number) => void;
+	defaultGeminiApiKey: string | null;
 }) => {
 	const handleUpdate = (
 		updateFn: (g: AnyGraderConfig) => AnyGraderConfig,
@@ -124,6 +126,11 @@ const GraderConfigCard = ({
 							<Input
 								id={geminiApiKeyId}
 								type="password"
+								placeholder={
+									defaultGeminiApiKey
+										? "Using saved API key (leave empty to use default)"
+										: "Enter your Gemini API key"
+								}
 								value={grader.gemini_api_key || ""}
 								onChange={e =>
 									handleUpdate(g => ({
@@ -218,6 +225,11 @@ const GraderConfigCard = ({
 							<Input
 								id={geminiApiKeyId}
 								type="password"
+								placeholder={
+									defaultGeminiApiKey
+										? "Using saved API key (leave empty to use default)"
+										: "Enter your Gemini API key"
+								}
 								value={grader.gemini_api_key || ""}
 								onChange={e =>
 									handleUpdate(g => ({
@@ -309,6 +321,11 @@ const GraderConfigCard = ({
 							<Input
 								id={geminiApiKeyId}
 								type="password"
+								placeholder={
+									defaultGeminiApiKey
+										? "Using saved API key (leave empty to use default)"
+										: "Enter your Gemini API key"
+								}
 								value={grader.gemini_api_key || ""}
 								onChange={e =>
 									handleUpdate(g => ({
@@ -487,6 +504,11 @@ const GraderConfigCard = ({
 							<Input
 								id={geminiApiKeyId}
 								type="password"
+								placeholder={
+									defaultGeminiApiKey
+										? "Using saved API key (leave empty to use default)"
+										: "Enter your Gemini API key"
+								}
 								value={grader.gemini_api_key || ""}
 								onChange={e =>
 									handleUpdate(g => ({
@@ -561,6 +583,7 @@ const GraderConfigCard = ({
 
 export function RewardConfigurator() {
 	const [config, setConfig] = useAtom(trainingConfigAtom);
+	const [geminiApiKey] = useAtom(geminiApiKeyAtom);
 	const [selectedGraderType, setSelectedGraderType] = useState<
 		AnyGraderConfig["type"] | ""
 	>("");
@@ -698,6 +721,7 @@ export function RewardConfigurator() {
 						index={index}
 						onUpdate={updateGrader}
 						onRemove={handleRemoveGrader}
+						defaultGeminiApiKey={geminiApiKey}
 					/>
 				))}
 			</div>
