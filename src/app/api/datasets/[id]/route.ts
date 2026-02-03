@@ -10,7 +10,9 @@ export async function GET(
 		const { id } = await context.params;
 
 		// MOCK MODE: Return fake dataset data for UI testing
-		const MOCK_MODE = true;
+		const MOCK_MODE =
+			process.env.MOCK_BACKEND_MODE === "true" &&
+			process.env.NODE_ENV === "development";
 		if (MOCK_MODE) {
 			console.log(
 				`Mock mode enabled - returning fake dataset data for ${id}`,

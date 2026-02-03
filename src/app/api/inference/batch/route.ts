@@ -26,7 +26,9 @@ export async function POST(request: Request) {
 		}
 
 		// MOCK MODE: Return fake inference results for UI testing
-		const MOCK_MODE = true;
+		const MOCK_MODE =
+			process.env.MOCK_BACKEND_MODE === "true" &&
+			process.env.NODE_ENV === "development";
 		if (MOCK_MODE) {
 			console.log(
 				"Mock mode enabled - returning fake batch inference data",

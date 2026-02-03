@@ -49,20 +49,30 @@ import Link from "next/link";
 import { type ReactElement, useEffect, useState } from "react";
 import { toast } from "sonner";
 
-interface UnifiedEvaluationFormProps {
-	job?: TrainingJob;
+export interface ModelConfig {
 	modelSource?: string;
 	modelType?: ModelType;
-	baseModelId?: string; // This should be the original base model ID (e.g., "gemma-3-270m")
-	useUnsloth?: boolean; // Whether Unsloth provider is used
-	useQuantization?: boolean; // Whether quantization is enabled
-	usePreTrained?: boolean; // Whether to use -pt instead of -it models
+	baseModelId?: string;
+	job?: TrainingJob;
+	useUnsloth?: boolean;
+	useQuantization?: boolean;
+	usePreTrained?: boolean;
 	initialDatasetId?: string;
+}
+
+interface UnifiedEvaluationFormProps extends ModelConfig {
 	isComparison?: boolean;
+	// Comparison configs
+	model1Config?: ModelConfig;
+	model2Config?: ModelConfig;
+
+	// Common props
+	evaluationMode: "metrics" | "batch_inference";
+
+	// Deprecated props (kept temporarily to avoid breaking build before parent update)
 	isComparisonMaster?: boolean;
 	modelLabel?: string;
 	sharedDatasetId?: string;
-	evaluationMode: "metrics" | "batch_inference";
 	preSelectedSamples?: DatasetSample[];
 	onDatasetChange?: (id: string) => void;
 	onSamplesChange?: (samples: DatasetSample[]) => void;
@@ -107,6 +117,9 @@ export default function UnifiedEvaluationForm({
 	usePreTrained,
 	initialDatasetId,
 	isComparison,
+	model1Config,
+	model2Config,
+	// Deprecated props
 	isComparisonMaster,
 	modelLabel,
 	sharedDatasetId,
@@ -115,28 +128,43 @@ export default function UnifiedEvaluationForm({
 	onDatasetChange,
 	onSamplesChange,
 }: UnifiedEvaluationFormProps) {
-	const originalBaseModelId = baseModelId || job?.base_model_id;
+	// Helper to reconstruct model ID
+	const getReconstructedId = (
+		c: ModelConfig | UnifiedEvaluationFormProps,
+	) => {
+		const originalBase = c.baseModelId || c.job?.base_model_id;
+		if (!originalBase) return "";
+
+		if (c.modelType === "base") {
+			const provider = c.useUnsloth ? "unsloth" : "huggingface";
+			const method = c.useQuantization ? "QLoRA" : "LoRA";
+			const trainingType = c.usePreTrained ? "pt" : "it";
+			return constructFullModelId(
+				`${originalBase}-${trainingType}`,
+				provider,
+				method,
+			);
+		}
+		return originalBase;
+	};
+
+	const singleModelId = getReconstructedId({
+		baseModelId,
+		job,
+		modelType,
+		useUnsloth,
+		useQuantization,
+		usePreTrained,
+	});
+
+	const model1Id = model1Config ? getReconstructedId(model1Config) : "";
+	const model2Id = model2Config ? getReconstructedId(model2Config) : "";
+
+	// Use single model ID or override if in legacy slave mode
+	const reconstructedBaseModelId = singleModelId;
+
 	const effectiveDatasetId =
 		sharedDatasetId || initialDatasetId || job?.processed_dataset_id || "";
-
-	// Reconstruct the full base_model_id based on user choices (unsloth/quantization/pretraining)
-	const reconstructedBaseModelId = originalBaseModelId
-		? (() => {
-				// If it's a base model, construct the full model ID with user choices
-				if (modelType === "base") {
-					const provider = useUnsloth ? "unsloth" : "huggingface";
-					const method = useQuantization ? "QLoRA" : "LoRA";
-					const trainingType = usePreTrained ? "pt" : "it";
-					return constructFullModelId(
-						`${originalBaseModelId}-${trainingType}`,
-						provider,
-						method,
-					);
-				}
-				// For trained models, use the original base model ID or the job's base model
-				return originalBaseModelId;
-			})()
-		: "";
 
 	const [dataset, setDataset] = useState<string>(effectiveDatasetId);
 	const [evaluationType, setEvaluationType] = useState<string>("task");
@@ -150,6 +178,18 @@ export default function UnifiedEvaluationForm({
 	const [results, setResults] = useState<
 		EvaluationResponse | BatchInferenceResponse | null
 	>(null);
+
+	// Comparison state
+	const [comparisonResults, setComparisonResults] = useState<{
+		model1: EvaluationResponse | BatchInferenceResponse | null;
+		model2: EvaluationResponse | BatchInferenceResponse | null;
+	} | null>(null);
+
+	const [comparisonLoading, setComparisonLoading] = useState<{
+		model1: boolean;
+		model2: boolean;
+	}>({ model1: false, model2: false });
+
 	const [error, setError] = useState<string | null>(null);
 	const [hfToken, setHfToken] = useState<string>("");
 	const [useVllm, setUseVllm] = useAtom(useVllmAtom);
@@ -268,126 +308,168 @@ export default function UnifiedEvaluationForm({
 		});
 	}
 
+	async function performEvaluation(
+		config: ModelConfig | UnifiedEvaluationFormProps,
+		id: string,
+	) {
+		const effectiveModelSource =
+			config.modelType === "base" ? id : config.modelSource;
+
+		if (!effectiveModelSource || !config.modelType || !id) {
+			throw new Error("Incomplete model configuration");
+		}
+
+		const endpoint =
+			evaluationMode === "metrics"
+				? "/api/evaluation"
+				: "/api/inference/batch";
+
+		const commonBody = {
+			model_source: effectiveModelSource,
+			model_type: config.modelType,
+			base_model_id: id,
+			dataset_id: dataset,
+			hf_token: hfToken,
+			use_vllm: useVllm,
+		};
+
+		let requestBody: EvaluationRequest | BatchInferenceRequest;
+
+		if (evaluationMode === "metrics") {
+			const metricsBody: EvaluationRequest = {
+				...commonBody,
+				max_samples: maxSamples,
+				num_sample_results: numSampleResults,
+			};
+			if (evaluationType === "task") {
+				metricsBody.task_type = taskType;
+			} else {
+				metricsBody.metrics = Array.from(selectedMetrics);
+			}
+			requestBody = metricsBody;
+		} else {
+			requestBody = {
+				...commonBody,
+				messages: selected.map(sample => getInferenceMessages(sample)),
+			};
+		}
+
+		const response = await fetch(endpoint, {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+			},
+			body: JSON.stringify(requestBody),
+		});
+
+		if (!response.ok) {
+			const errorData = await response.json().catch(() => ({}));
+			throw new Error(
+				errorData.error ||
+					`Request failed with status ${response.status}`,
+			);
+		}
+
+		return await response.json();
+	}
+
 	async function runEvaluation() {
 		setLoading(true);
+		setComparisonLoading({ model1: true, model2: true });
 		setError(null);
 		setResults(null);
+		setComparisonResults(null);
 
 		try {
-			if (provider === "huggingface" && !hfToken) {
-				toast.error(
-					"HuggingFace token is required for HuggingFace models",
-				);
-				setLoading(false);
-				return;
-			}
+			if (isComparison && model1Config && model2Config) {
+				const [p1, p2] = await Promise.allSettled([
+					performEvaluation(model1Config, model1Id),
+					performEvaluation(model2Config, model2Id),
+				]);
 
-			if (!modelSource || !modelType || !reconstructedBaseModelId) {
-				throw new Error(
-					"Evaluation requires a model source, model type, and base model ID",
-				);
-			}
-
-			// For base models, use the reconstructed base model ID as the model source
-			const effectiveModelSource =
-				modelType === "base" ? reconstructedBaseModelId : modelSource;
-
-			const endpoint =
-				evaluationMode === "metrics"
-					? "/api/evaluation"
-					: "/api/inference/batch";
-
-			let requestBody: EvaluationRequest | BatchInferenceRequest;
-
-			if (evaluationMode === "metrics") {
-				if (evaluationType === "task") {
-					requestBody = {
-						model_source: effectiveModelSource,
-						model_type: modelType,
-						base_model_id: reconstructedBaseModelId,
-						dataset_id: dataset,
-						task_type: taskType,
-						max_samples: maxSamples,
-						num_sample_results: numSampleResults,
-						hf_token: hfToken,
-						use_vllm: useVllm,
-					};
-				} else {
-					// metrics-based evaluation
-					requestBody = {
-						model_source: effectiveModelSource,
-						model_type: modelType,
-						base_model_id: reconstructedBaseModelId,
-						dataset_id: dataset,
-						metrics: Array.from(selectedMetrics),
-						max_samples: maxSamples,
-						num_sample_results: numSampleResults,
-						hf_token: hfToken,
-						use_vllm: useVllm,
-					};
+				const errors: string[] = [];
+				if (p1.status === "rejected") {
+					const reason =
+						p1.reason instanceof Error
+							? p1.reason.message
+							: String(p1.reason);
+					errors.push(`Model 1: ${reason}`);
 				}
+				if (p2.status === "rejected") {
+					const reason =
+						p2.reason instanceof Error
+							? p2.reason.message
+							: String(p2.reason);
+					errors.push(`Model 2: ${reason}`);
+				}
+
+				if (errors.length > 0) throw new Error(errors.join("\n"));
+
+				setComparisonResults({
+					model1: p1.status === "fulfilled" ? p1.value : null,
+					model2: p2.status === "fulfilled" ? p2.value : null,
+				});
 			} else {
-				// For batch inference, convert samples to message arrays
-				requestBody = {
-					model_source: effectiveModelSource,
-					model_type: modelType,
-					base_model_id: reconstructedBaseModelId,
-					messages: selected.map(sample => {
-						const messages = getInferenceMessages(sample);
-						return messages;
-					}),
-					hf_token: hfToken,
-					use_vllm: useVllm,
+				const currentConfig: ModelConfig = {
+					modelSource,
+					modelType,
+					baseModelId,
+					job,
+					useUnsloth,
+					useQuantization,
+					usePreTrained,
 				};
-			}
-
-			const response = await fetch(endpoint, {
-				method: "POST",
-				headers: {
-					"Content-Type": "application/json",
-				},
-				body: JSON.stringify(requestBody),
-			});
-
-			if (!response.ok) {
-				const errorData = await response.json().catch(() => ({}));
-				throw new Error(
-					errorData.error ||
-						`Request failed with status ${response.status}`,
+				const res = await performEvaluation(
+					currentConfig,
+					singleModelId,
 				);
+				setResults(res);
 			}
-
-			const result = await response.json();
-			setResults(result);
 		} catch (err: unknown) {
+			console.error("Evaluation failed:", err);
 			setError(err instanceof Error ? err.message : String(err));
 		} finally {
 			setLoading(false);
+			setComparisonLoading({ model1: false, model2: false });
 		}
 	}
 
-	function formatMetricValue(
-		value: number | Record<string, number>,
-	): ReactElement | string {
-		if (typeof value === "number") {
-			return value.toFixed(4);
+	function getNumericValue(
+		val: number | string | Record<string, number> | undefined | null,
+	): number {
+		if (typeof val === "number") return val;
+		if (typeof val === "object" && val !== null) {
+			const values = Object.values(val).filter(
+				(v): v is number => typeof v === "number",
+			);
+			if (values.length === 0) return 0;
+			return values.reduce((a, b) => a + b, 0) / values.length;
 		}
+		return 0;
+	}
 
-		// Handle nested metrics as a table
-		return (
-			<div className="space-y-1">
-				{Object.entries(value).map(([key, val]) => (
-					<div key={key} className="flex justify-between text-xs">
-						<span className="text-muted-foreground capitalize">
-							{key.replace(/_/g, " ")}:
-						</span>
-						<span className="font-medium">
-							{typeof val === "number" ? val.toFixed(4) : val}
-						</span>
-					</div>
-				))}
-			</div>
-		);
+	function formatMetricValue(
+		val: number | string | Record<string, number> | undefined | null,
+	) {
+		if (val === null || val === undefined) return "-";
+		if (typeof val === "number") return val.toFixed(4);
+		if (typeof val === "object") {
+			return (
+				<div className="grid grid-cols-[auto_auto] gap-x-4 gap-y-1 w-full text-xs justify-start">
+					{Object.entries(val).map(([key, v]) => (
+						<div key={key} className="contents">
+							<span className="text-muted-foreground capitalize truncate">
+								{key.replace(/_/g, " ")}:
+							</span>
+							<span className="font-medium">
+								{typeof v === "number" ? v.toFixed(4) : v}
+							</span>
+						</div>
+					))}
+				</div>
+			);
+		}
+		return String(val);
 	}
 
 	return (
@@ -402,112 +484,118 @@ export default function UnifiedEvaluationForm({
 			<CardContent>
 				<div className="flex flex-col gap-6">
 					{/* Model Information Display */}
-					{(modelSource ||
-						modelType ||
-						reconstructedBaseModelId ||
-						job) && (
-						<div className="p-4 bg-muted/30 rounded-lg border">
-							<div className="text-sm font-semibold mb-3 text-muted-foreground">
-								Model Information
+					{isComparison && model1Config && model2Config ? (
+						<div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+							<div className="p-3 bg-muted/30 rounded border">
+								<div className="text-sm font-semibold mb-2 text-muted-foreground">
+									Model 1
+								</div>
+								<div className="text-xs font-mono break-all">
+									{model1Id}
+								</div>
+								<div className="text-xs text-muted-foreground mt-1 capitalize">
+									{model1Config.modelType}
+								</div>
 							</div>
-							<div className="grid gap-3 text-sm">
-								{modelType && (
-									<div>
-										<span className="font-medium">
-											Type:
-										</span>{" "}
-										<span className="text-muted-foreground capitalize">
-											{modelType === "base"
-												? "Base Model"
-												: modelType === "adapter"
-													? "LoRA Adapter"
-													: modelType === "merged"
-														? "Merged Model"
-														: modelType}
-										</span>
-									</div>
-								)}
-								{reconstructedBaseModelId && (
-									<div>
-										<span className="font-medium">
-											Model ID:
-										</span>{" "}
-										<span className="text-muted-foreground font-mono text-xs">
-											{reconstructedBaseModelId}
-										</span>
-									</div>
-								)}
-								{(modelType === "base"
-									? reconstructedBaseModelId
-									: modelSource) && (
-									<div>
-										<span className="font-medium">
-											Source:
-										</span>{" "}
-										<span className="text-muted-foreground font-mono text-xs">
-											{modelType === "base"
-												? reconstructedBaseModelId
-												: modelSource}
-										</span>
-									</div>
-								)}
-							</div>
-						</div>
-					)}
-
-					{isComparison && modelLabel && (
-						<div className="text-center">
-							<div className="text-sm font-medium text-muted-foreground bg-muted/50 rounded px-3 py-1 inline-block">
-								{modelLabel}
-							</div>
-						</div>
-					)}
-
-					{/* Dataset selection - only show in single mode or if no shared dataset */}
-					{!isComparison || !sharedDatasetId ? (
-						<div className="flex flex-col gap-2 space-y-4">
-							<Label
-								htmlFor={`dataset-${modelLabel || "single"}`}
-								className="font-semibold"
-							>
-								Dataset ID
-							</Label>
-							{!isComparison && (
-								<span className="text-sm text-muted-foreground">
-									You can find dataset IDs in your dataset
-									management dashboard.
-								</span>
-							)}
-							<div className="flex gap-2">
-								<Input
-									id={`dataset-${modelLabel || "single"}`}
-									value={dataset}
-									onChange={e => setDataset(e.target.value)}
-									placeholder="Enter dataset ID..."
-									disabled={loading}
-									className={`flex-1 ${isComparison ? "text-sm h-8" : ""}`}
-								/>
-								{evaluationMode === "batch_inference" &&
-									(!isComparison || !!isComparisonMaster) && (
-										<Button
-											onClick={fetchSamples}
-											disabled={loading || !dataset}
-											variant="outline"
-										>
-											Load Samples
-										</Button>
-									)}
+							<div className="p-3 bg-muted/30 rounded border">
+								<div className="text-sm font-semibold mb-2 text-muted-foreground">
+									Model 2
+								</div>
+								<div className="text-xs font-mono break-all">
+									{model2Id}
+								</div>
+								<div className="text-xs text-muted-foreground mt-1 capitalize">
+									{model2Config.modelType}
+								</div>
 							</div>
 						</div>
 					) : (
-						// Comparison mode with shared dataset
-						<div className="text-sm text-muted-foreground bg-muted/50 rounded p-3">
-							<div className="font-medium mb-1">
-								Using shared dataset from comparison
+						(modelSource ||
+							modelType ||
+							reconstructedBaseModelId ||
+							job) && (
+							<div className="p-4 bg-muted/30 rounded-lg border">
+								<div className="text-sm font-semibold mb-3 text-muted-foreground">
+									Model Information
+								</div>
+								<div className="grid gap-3 text-sm">
+									{modelType && (
+										<div>
+											<span className="font-medium">
+												Type:
+											</span>{" "}
+											<span className="text-muted-foreground capitalize">
+												{modelType === "base"
+													? "Base Model"
+													: modelType === "adapter"
+														? "LoRA Adapter"
+														: modelType === "merged"
+															? "Merged Model"
+															: modelType}
+											</span>
+										</div>
+									)}
+									{reconstructedBaseModelId && (
+										<div>
+											<span className="font-medium">
+												Model ID:
+											</span>{" "}
+											<span className="text-muted-foreground font-mono text-xs">
+												{reconstructedBaseModelId}
+											</span>
+										</div>
+									)}
+									{(modelType === "base"
+										? reconstructedBaseModelId
+										: modelSource) && (
+										<div>
+											<span className="font-medium">
+												Source:
+											</span>{" "}
+											<span className="text-muted-foreground font-mono text-xs">
+												{modelType === "base"
+													? reconstructedBaseModelId
+													: modelSource}
+											</span>
+										</div>
+									)}
+								</div>
 							</div>
-							<div>Dataset: {sharedDatasetId}</div>
-						</div>
+						)
 					)}
+
+					{/* Dataset selection */}
+					<div className="flex flex-col gap-2 space-y-4">
+						<Label
+							htmlFor={`dataset-${modelLabel || "single"}`}
+							className="font-semibold"
+						>
+							Dataset ID
+						</Label>
+						<span className="text-sm text-muted-foreground">
+							You can find dataset IDs in your dataset management
+							dashboard.
+						</span>
+						<div className="flex gap-2">
+							<Input
+								id={`dataset-${modelLabel || "single"}`}
+								value={dataset}
+								onChange={e => setDataset(e.target.value)}
+								placeholder="Enter dataset ID..."
+								disabled={loading}
+								className={`flex-1 ${isComparison ? "text-sm h-10" : ""}`}
+							/>
+							{evaluationMode === "batch_inference" && (
+								<Button
+									onClick={fetchSamples}
+									disabled={loading || !dataset}
+									variant="outline"
+								>
+									Load Samples
+								</Button>
+							)}
+						</div>
+					</div>
 
 					<div className="flex flex-col gap-2">
 						<Label htmlFor="hfToken" className="font-semibold">
@@ -557,7 +645,7 @@ export default function UnifiedEvaluationForm({
 					{evaluationMode === "metrics" ? (
 						// Metrics-specific fields
 						<div
-							className={`space-y-4 ${isComparison ? "space-y-3" : ""}`}
+							className={`gap-4  ${isComparison ? "grid grid-cols-2 p-1" : "grid grid-cols-1 md:grid-cols-2"}`}
 						>
 							<div className="flex flex-col gap-2">
 								<Label
@@ -628,19 +716,15 @@ export default function UnifiedEvaluationForm({
 							)}
 
 							{evaluationType === "metrics" && (
-								<div className="flex flex-col gap-3">
+								<div
+									className={`flex flex-col gap-3 ${isComparison ? "col-span-2" : "md:col-span-2"}`}
+								>
 									<Label
 										className={`font-semibold ${isComparison ? "text-sm" : ""}`}
 									>
 										Select Metrics
 									</Label>
-									<div
-										className={`grid gap-2 ${
-											isComparison
-												? "grid-cols-2"
-												: "grid-cols-3"
-										}`}
-									>
+									<div className="grid gap-2 grid-cols-2 md:grid-cols-3">
 										{METRIC_TYPES.map(metric => (
 											<div
 												key={metric.value}
@@ -671,8 +755,10 @@ export default function UnifiedEvaluationForm({
 							)}
 
 							<div
-								className={`grid gap-4 ${
-									isComparison ? "grid-cols-1" : "grid-cols-2"
+								className={`grid gap-4 md:col-span-2 ${
+									isComparison
+										? "grid-cols-1 mt-4"
+										: "grid-cols-2"
 								}`}
 							>
 								<div className="flex flex-col gap-2">
@@ -699,446 +785,644 @@ export default function UnifiedEvaluationForm({
 										}
 									/>
 								</div>
-								{!isComparison && (
-									<div className="flex flex-col gap-2">
-										<Label className="font-semibold">
-											Sample Results to Show
-										</Label>
-										<Input
-											value={numSampleResults.toString()}
-											onChange={e =>
-												setNumSampleResults(
-													Number.parseInt(
-														e.target.value,
-													) || 0,
-												)
-											}
-											type="number"
-											min="0"
-											disabled={loading}
-										/>
-									</div>
-								)}
+								<div className="flex flex-col gap-2">
+									<Label className="font-semibold">
+										Sample Results to Show
+									</Label>
+									<Input
+										value={numSampleResults.toString()}
+										onChange={e =>
+											setNumSampleResults(
+												Number.parseInt(
+													e.target.value,
+												) || 0,
+											)
+										}
+										type="number"
+										min="0"
+										disabled={loading}
+									/>
+								</div>
 							</div>
 						</div>
 					) : (
 						// Batch inference-specific fields
 						<div className="space-y-4">
-							{/* Show dataset samples for selection if not in comparison mode */}
-							{(!isComparison || !!isComparisonMaster) &&
-								splits.length > 0 && (
-									<div className="flex items-center gap-2">
-										<Label
-											htmlFor={`split-${modelLabel || "single"}`}
-											className="font-semibold"
-										>
-											Split:
-										</Label>
-										<Select
-											value={selectedSplit}
-											onValueChange={handleSplitChange}
-											disabled={loading}
-										>
-											<SelectTrigger className="w-48">
-												<SelectValue />
-											</SelectTrigger>
-											<SelectContent>
-												{splits.map(split => (
-													<SelectItem
-														key={split.split_name}
-														value={split.split_name}
-													>
-														{split.split_name} (
-														{split.num_rows} rows)
-													</SelectItem>
-												))}
-											</SelectContent>
-										</Select>
-									</div>
-								)}
-
-							{(!isComparison || !!isComparisonMaster) &&
-								splits.length > 0 &&
-								samples.length === 0 && (
-									<div className="p-4 border border-gray-200 rounded text-sm">
-										No valid samples found in this split.
-										Please select a different split or
-										ensure your dataset contains valid
-										samples for inference.
-									</div>
-								)}
-
-							{(!isComparison || !!isComparisonMaster) &&
-								samples.length > 0 && (
-									<div className="space-y-4">
-										<div className="flex justify-between items-center">
-											<Label className="font-semibold">
-												Select Samples for Inference
-											</Label>
-											<span className="text-sm text-muted-foreground">
-												{selected.length} selected
-											</span>
-										</div>
-
-										<div className="grid gap-3">
-											{samples.map((sample, idx) => (
-												<button
-													type="button"
-													key={getSampleKey(sample)}
-													className={`p-3 border rounded cursor-pointer transition-colors text-left w-full ${
-														selected.some(
-															s =>
-																getSampleKey(
-																	s,
-																) ===
-																getSampleKey(
-																	sample,
-																),
-														)
-															? "border-primary bg-primary/5"
-															: "border-border hover:border-primary/50"
-													}`}
-													onClick={() =>
-														toggleSampleSelection(
-															sample,
-														)
-													}
-													aria-label={`Toggle selection for sample ${idx + 1}`}
+							{/* Show dataset samples for selection */}
+							{splits.length > 0 && (
+								<div className="flex items-center gap-2">
+									<Label
+										htmlFor={`split-${modelLabel || "single"}`}
+										className="font-semibold"
+									>
+										Split:
+									</Label>
+									<Select
+										value={selectedSplit}
+										onValueChange={handleSplitChange}
+										disabled={loading}
+									>
+										<SelectTrigger className="w-48">
+											<SelectValue />
+										</SelectTrigger>
+										<SelectContent>
+											{splits.map(split => (
+												<SelectItem
+													key={split.split_name}
+													value={split.split_name}
 												>
-													<div className="text-sm">
-														<strong>
-															Sample {idx + 1}:
-														</strong>
-														<div className="mt-2 max-h-32 overflow-y-auto border rounded p-2 bg-muted/20">
-															<MessageDisplay
-																sample={sample}
-																compact={true}
-															/>
-														</div>
-													</div>
-												</button>
+													{split.split_name} (
+													{split.num_rows} rows)
+												</SelectItem>
 											))}
-										</div>
-									</div>
-								)}
+										</SelectContent>
+									</Select>
+								</div>
+							)}
 
-							{isComparison &&
-								!isComparisonMaster &&
-								preSelectedSamples && (
-									<div className="text-sm text-muted-foreground bg-muted/50 rounded p-3">
-										Using {preSelectedSamples.length}{" "}
-										pre-selected samples for comparison.
+							{splits.length > 0 && samples.length === 0 && (
+								<div className="p-4 border border-gray-200 rounded text-sm">
+									No valid samples found in this split. Please
+									select a different split or ensure your
+									dataset contains valid samples for
+									inference.
+								</div>
+							)}
+
+							{samples.length > 0 && (
+								<div className="space-y-4">
+									<div className="flex justify-between items-center">
+										<Label className="font-semibold">
+											Select Samples for Inference
+										</Label>
+										<span className="text-sm text-muted-foreground">
+											{selected.length} selected
+										</span>
 									</div>
-								)}
+
+									<div className="grid gap-3">
+										{samples.map((sample, idx) => (
+											<button
+												type="button"
+												key={getSampleKey(sample)}
+												className={`p-3 border rounded cursor-pointer transition-colors text-left w-full ${
+													selected.some(
+														s =>
+															getSampleKey(s) ===
+															getSampleKey(
+																sample,
+															),
+													)
+														? "border-primary bg-primary/5"
+														: "border-border hover:border-primary/50"
+												}`}
+												onClick={() =>
+													toggleSampleSelection(
+														sample,
+													)
+												}
+											>
+												<MessageDisplay
+													sample={sample}
+													compact={false}
+												/>
+											</button>
+										))}
+									</div>
+								</div>
+							)}
 						</div>
 					)}
 
-					<Button
-						onClick={runEvaluation}
-						disabled={
-							loading ||
-							!dataset ||
-							(evaluationMode === "metrics" &&
-								evaluationType === "metrics" &&
-								selectedMetrics.size === 0) ||
-							(evaluationMode === "batch_inference" &&
-								selected.length === 0) ||
-							(provider === "huggingface" && !hfToken.trim())
-						}
-						className={`w-full ${isComparison ? "h-8 text-sm" : ""}`}
-					>
-						{loading ? (
-							<>
-								<Loader2
-									className={`animate-spin mr-2 ${
-										isComparison ? "w-3 h-3" : "w-4 h-4"
-									}`}
-								/>
-								Running...
-							</>
-						) : (
-							`Run ${
-								evaluationMode === "metrics"
-									? "Evaluation"
-									: "Batch Inference"
-							}`
-						)}
-					</Button>
+					<div className="flex gap-2">
+						<Button
+							onClick={runEvaluation}
+							disabled={
+								loading ||
+								!dataset ||
+								(evaluationMode === "metrics" &&
+									evaluationType === "metrics" &&
+									selectedMetrics.size === 0) ||
+								(evaluationMode === "batch_inference" &&
+									selected.length === 0) ||
+								(provider === "huggingface" && !hfToken.trim())
+							}
+							className={`w-full ${isComparison ? "h-10 text-base" : ""}`}
+						>
+							{loading ? (
+								<>
+									<Loader2 className="animate-spin mr-2 w-4 h-4" />
+									Running...
+								</>
+							) : (
+								`Run ${
+									evaluationMode === "metrics"
+										? "Evaluation"
+										: "Batch Inference"
+								}`
+							)}
+						</Button>
+					</div>
 
 					{/* Results display */}
-					{results && (
-						<div className="space-y-4">
-							<div
-								className={`font-semibold ${isComparison ? "text-sm" : ""}`}
-							>
+					{/* Results display */}
+					{(results || comparisonResults) && (
+						<div className="space-y-6 mt-6 border-t pt-6">
+							<div className="font-semibold text-lg">
 								{isComparison
-									? `${modelLabel} Results`
+									? "Comparison Results"
 									: evaluationMode === "metrics"
 										? "Evaluation Results"
 										: "Inference Results"}
 							</div>
 
-							{evaluationMode === "metrics" &&
-								"metrics" in results &&
-								results.metrics &&
-								Object.keys(results.metrics).length > 0 && (
-									<div className="space-y-3">
-										<div
-											className={`font-medium ${isComparison ? "text-sm" : ""}`}
-										>
-											Metrics
-										</div>
-										<div
-											className={`grid gap-3 ${
-												isComparison
-													? "grid-cols-1"
-													: "grid-cols-2 md:grid-cols-3"
-											}`}
-										>
-											{Object.entries(
-												results.metrics,
-											).map(([metric, value]) => (
-												<div
-													key={metric}
-													className="p-3 bg-muted/50 rounded border"
-												>
-													<div
-														className={`font-medium capitalize mb-1 ${
-															isComparison
-																? "text-xs"
-																: "text-sm"
-														}`}
-													>
-														{metric.replace(
-															/_/g,
-															" ",
-														)}
-													</div>
-													<div
-														className={`${
-															isComparison
-																? "text-xs"
-																: "text-sm"
-														}`}
-													>
-														{formatMetricValue(
-															value,
-														)}
-													</div>
+							{/* Comparison Mode Results */}
+							{isComparison && comparisonResults && (
+								<div className="space-y-6">
+									{/* 1. Comparison Metrics */}
+									{evaluationMode === "metrics" &&
+										comparisonResults.model1 &&
+										"metrics" in comparisonResults.model1 &&
+										comparisonResults.model2 &&
+										"metrics" in
+											comparisonResults.model2 && (
+											<div className="space-y-3">
+												<div className="font-medium">
+													Metrics Comparison
 												</div>
-											))}
-										</div>
-									</div>
-								)}
+												<div className="rounded-md border">
+													<div className="grid grid-cols-[minmax(120px,1fr)_1.5fr_1.5fr] bg-muted/50 font-medium text-sm rounded-t-md">
+														<div className="p-3 px-4">
+															Metric
+														</div>
+														<div className="p-3 px-4 border-l border-border">
+															Model 1
+														</div>
+														<div className="p-3 px-4 border-l border-border">
+															Model 2
+														</div>
+													</div>
+													{Object.keys(
+														(
+															comparisonResults.model1 as EvaluationResponse
+														).metrics,
+													).map(metric => {
+														const val1 = (
+															comparisonResults.model1 as EvaluationResponse
+														).metrics[metric];
+														const val2 = (
+															comparisonResults.model2 as EvaluationResponse
+														).metrics[metric];
+														const num1 =
+															getNumericValue(
+																val1,
+															);
+														const num2 =
+															getNumericValue(
+																val2,
+															);
+														const better1 =
+															num1 > num2;
+														const better2 =
+															num2 > num1;
 
-							{evaluationMode === "metrics" &&
-								"samples" in results &&
-								results.samples &&
-								results.samples.length > 0 &&
-								!isComparison && (
+														return (
+															<div
+																key={metric}
+																className="grid grid-cols-[minmax(120px,1fr)_1.5fr_1.5fr] border-t text-sm items-start"
+															>
+																<div className="p-3 px-4 capitalize">
+																	{metric.replace(
+																		/_/g,
+																		" ",
+																	)}
+																</div>
+																<div
+																	className={`p-3 px-4 border-l border-border ${
+																		better1
+																			? "text-green-600 font-semibold"
+																			: ""
+																	}`}
+																>
+																	{formatMetricValue(
+																		val1,
+																	)}
+																</div>
+																<div
+																	className={`p-3 px-4 border-l border-border ${
+																		better2
+																			? "text-green-600 font-semibold"
+																			: ""
+																	}`}
+																>
+																	{formatMetricValue(
+																		val2,
+																	)}
+																</div>
+															</div>
+														);
+													})}
+												</div>
+											</div>
+										)}
+
+									{/* 2. Comparison Samples */}
 									<div className="space-y-3">
 										<div className="font-medium">
-											Sample Results
+											{evaluationMode === "metrics"
+												? "Sample Comparison"
+												: "Response Comparison"}
 										</div>
-										<div className="space-y-3">
-											{results.samples.map(
-												(
-													sample: SampleResult,
-													idx: number,
-												) => (
+										<div className="space-y-4">
+											{(evaluationMode === "metrics"
+												? (
+														comparisonResults.model1 as EvaluationResponse
+													).samples
+												: (
+														comparisonResults.model1 as BatchInferenceResponse
+													).results
+											).map((item, idx) => {
+												// Extract data depending on mode
+												const sampleIndex =
+													evaluationMode === "metrics"
+														? (item as SampleResult)
+																.sample_index
+														: idx;
+
+												// For input display
+												const inputSample =
+													evaluationMode === "metrics"
+														? (item as SampleResult)
+																.input
+														: selected[idx]
+															? getInferenceMessages(
+																	selected[
+																		idx
+																	],
+																)
+															: null;
+
+												const ref =
+													evaluationMode === "metrics"
+														? (item as SampleResult)
+																.reference
+														: selected[idx]
+															? getGroundTruth(
+																	selected[
+																		idx
+																	],
+																)
+															: null;
+
+												// Model predictions
+												const pred1 =
+													evaluationMode === "metrics"
+														? (item as SampleResult)
+																.prediction
+														: (
+																comparisonResults.model1 as BatchInferenceResponse
+															).results[idx];
+
+												const pred2 =
+													evaluationMode === "metrics"
+														? ((
+																comparisonResults.model2 as EvaluationResponse
+															).samples?.[idx]
+																?.prediction ??
+															"missing")
+														: ((
+																comparisonResults.model2 as BatchInferenceResponse
+															).results?.[idx] ??
+															"no result");
+
+												return (
 													<div
-														key={
-															sample.sample_index
-														}
-														className="p-4 border border-border rounded space-y-2"
+														// biome-ignore lint/suspicious/noArrayIndexKey: idx is stable here as it maps 1:1 to selected samples
+														key={idx}
+														className="border rounded-lg p-4 space-y-3"
 													>
-														<div className="text-sm font-medium">
+														<div className="text-sm font-medium text-muted-foreground">
 															Sample{" "}
-															{sample.sample_index +
-																1}
+															{sampleIndex + 1}
 														</div>
-														{sample.input && (
-															<div>
-																<div className="text-xs font-medium text-muted-foreground mb-1">
-																	Input:
+
+														{/* Shared Input */}
+														{inputSample && (
+															<div className="bg-background border border-input p-3 rounded-md shadow-sm">
+																<div className="text-xs font-semibold text-muted-foreground mb-1">
+																	Input
 																</div>
-																<div className="max-h-32 overflow-y-auto border rounded p-2 bg-muted/20">
+																<div className="max-h-60 overflow-y-auto">
 																	<MessageDisplay
 																		messages={
-																			sample.input
+																			inputSample
 																		}
 																		compact={
-																			true
+																			false
 																		}
 																	/>
 																</div>
 															</div>
 														)}
-														<div className="grid grid-cols-2 gap-4">
-															<div>
-																<div className="text-xs font-medium text-muted-foreground mb-1">
-																	Prediction:
+
+														{/* Reference/Ground Truth */}
+														{ref && (
+															<div className="bg-muted/20 p-3 rounded-md">
+																<div className="text-xs font-semibold text-muted-foreground mb-1">
+																	{evaluationMode ===
+																	"metrics"
+																		? "Reference"
+																		: "Ground Truth"}
 																</div>
-																<div className="text-sm p-3 border rounded max-h-32 overflow-y-auto whitespace-pre-wrap bg-muted/10">
-																	{
-																		sample.prediction
-																	}
+																<div className="text-sm whitespace-pre-wrap max-h-24 overflow-y-auto">
+																	{(() => {
+																		const content =
+																			typeof ref ===
+																			"string"
+																				? ref
+																				: ref?.content;
+
+																		if (
+																			typeof content ===
+																			"string"
+																		)
+																			return content;
+																		if (
+																			content
+																		)
+																			return JSON.stringify(
+																				content,
+																			);
+																		return JSON.stringify(
+																			ref,
+																		);
+																	})()}
 																</div>
 															</div>
-															<div>
-																<div className="text-xs font-medium text-muted-foreground mb-1">
-																	Reference:
+														)}
+
+														{/* Side-by-Side Predictions */}
+														<div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+															<div className="border rounded-md p-3">
+																<div className="text-xs font-semibold text-muted-foreground mb-2 flex justify-between">
+																	<span>
+																		Model 1
+																		Response
+																	</span>
 																</div>
-																<div className="text-sm p-3 border rounded max-h-32 overflow-y-auto whitespace-pre-wrap bg-muted/10">
-																	{
-																		sample.reference
-																	}
+																<div className="text-sm whitespace-pre-wrap">
+																	{pred1}
+																</div>
+															</div>
+															<div className="border rounded-md p-3">
+																<div className="text-xs font-semibold text-muted-foreground mb-2 flex justify-between">
+																	<span>
+																		Model 2
+																		Response
+																	</span>
+																</div>
+																<div className="text-sm whitespace-pre-wrap">
+																	{pred2}
 																</div>
 															</div>
 														</div>
 													</div>
-												),
-											)}
+												);
+											})}
 										</div>
 									</div>
-								)}
+								</div>
+							)}
 
-							{evaluationMode === "batch_inference" &&
-								"results" in results &&
-								results.results &&
-								results.results.length > 0 && (
-									<div className="space-y-4">
-										{isComparison ? (
-											// Compact results for comparison mode
-											<div className="space-y-2">
-												{results.results.map(
-													(
-														result: string,
-														idx: number,
-													) => (
+							{/* Single Mode Results (Legacy View) */}
+							{!isComparison && results && (
+								<div className="space-y-4">
+									{evaluationMode === "metrics" &&
+										"metrics" in results &&
+										results.metrics &&
+										Object.keys(results.metrics).length >
+											0 && (
+											<div className="space-y-3">
+												<div className="font-medium">
+													Metrics
+												</div>
+												<div className="grid gap-3 grid-cols-2 md:grid-cols-3">
+													{Object.entries(
+														results.metrics,
+													).map(([metric, value]) => (
 														<div
-															key={`result-${idx}-${result.slice(0, 20)}`}
-															className="p-2 bg-muted/50 rounded text-xs"
+															key={metric}
+															className="p-3 bg-muted/50 rounded border"
 														>
-															<div className="font-medium mb-1">
-																Response{" "}
-																{idx + 1}:
+															<div className="font-medium capitalize mb-1 text-sm">
+																{metric.replace(
+																	/_/g,
+																	" ",
+																)}
 															</div>
-															<div className="whitespace-pre-wrap">
-																{result}
+															<div className="text-sm">
+																{formatMetricValue(
+																	value,
+																)}
 															</div>
 														</div>
-													),
-												)}
+													))}
+												</div>
 											</div>
-										) : (
-											// Full results for single mode
-											<div className="grid gap-4">
-												{results.results.map(
-													(
-														result: string,
-														idx: number,
-													) => {
-														const sample =
-															selected[idx];
-														const groundTruth =
-															sample
-																? getGroundTruth(
-																		sample,
-																	)
-																: null;
+										)}
 
-														return (
+									{/* Single Mode Samples */}
+									{evaluationMode === "metrics" &&
+										"samples" in results &&
+										results.samples &&
+										results.samples.length > 0 && (
+											<div className="space-y-3">
+												<div className="font-medium">
+													Sample Results
+												</div>
+												<div className="space-y-3">
+													{results.samples.map(
+														(
+															sample: SampleResult,
+														) => (
 															<div
-																key={`full-result-${idx}-${result.slice(0, 20)}`}
-																className="p-4 border border-border rounded space-y-3"
+																key={
+																	sample.sample_index
+																}
+																className="border rounded-lg p-4 space-y-3"
 															>
-																<div className="text-sm font-medium">
+																<div className="text-sm font-medium text-muted-foreground">
 																	Sample{" "}
-																	{idx + 1}
+																	{sample.sample_index +
+																		1}
 																</div>
 
-																{sample && (
-																	<div>
-																		<div className="text-xs font-medium text-muted-foreground mb-1">
-																			Input:
+																{/* Input - Matching Comparison Mode */}
+																{sample.input && (
+																	<div className="bg-background border border-input p-3 rounded-md shadow-sm">
+																		<div className="text-xs font-semibold text-muted-foreground mb-1">
+																			Input
 																		</div>
-																		<div className="max-h-32 overflow-y-auto border rounded p-2 bg-muted/20">
+																		<div className="max-h-60 overflow-y-auto">
 																			<MessageDisplay
-																				sample={
-																					sample
+																				messages={
+																					sample.input
 																				}
 																				compact={
-																					true
+																					false
 																				}
 																			/>
 																		</div>
 																	</div>
 																)}
 
-																<div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-																	<div>
-																		<div className="text-xs font-medium text-muted-foreground mb-1">
-																			Model
-																			Response:
-																		</div>
-																		<div className="text-sm p-3 border rounded whitespace-pre-wrap max-h-40 overflow-y-auto bg-muted/10">
-																			{
-																				result
-																			}
-																		</div>
+																{/* Reference - Matching Comparison Mode */}
+																<div className="bg-muted/20 p-3 rounded-md">
+																	<div className="text-xs font-semibold text-muted-foreground mb-1">
+																		Reference
 																	</div>
+																	<div className="text-sm whitespace-pre-wrap max-h-24 overflow-y-auto">
+																		{(() => {
+																			const content =
+																				typeof sample.reference ===
+																				"string"
+																					? sample.reference
+																					: sample
+																							.reference
+																							?.content;
 
-																	{groundTruth && (
+																			return typeof content ===
+																				"string"
+																				? content
+																				: JSON.stringify(
+																						content ||
+																							sample.reference,
+																					);
+																		})()}
+																	</div>
+																</div>
+
+																{/* Prediction - Matching Comparison Mode Response Card */}
+																<div className="border rounded-md p-3">
+																	<div className="text-xs font-semibold text-muted-foreground mb-2">
+																		Model
+																		Response
+																	</div>
+																	<div className="text-sm whitespace-pre-wrap">
+																		{
+																			sample.prediction
+																		}
+																	</div>
+																</div>
+															</div>
+														),
+													)}
+												</div>
+											</div>
+										)}
+
+									{/* Batch Inference Single Results */}
+									{evaluationMode === "batch_inference" &&
+										"results" in results &&
+										results.results &&
+										results.results.length > 0 && (
+											<div className="space-y-4">
+												<div className="grid gap-4">
+													{results.results.map(
+														(
+															result: string,
+															idx: number,
+														) => {
+															const sample =
+																selected[idx];
+															const groundTruth =
+																sample
+																	? getGroundTruth(
+																			sample,
+																		)
+																	: null;
+
+															return (
+																<div
+																	key={`full-result-${idx}-${result.slice(0, 20)}`}
+																	className="p-4 border border-border rounded space-y-3"
+																>
+																	<div className="text-sm font-medium">
+																		Sample{" "}
+																		{idx +
+																			1}
+																	</div>
+																	{sample && (
 																		<div>
 																			<div className="text-xs font-medium text-muted-foreground mb-1">
-																				Expected
-																				Response:
+																				Input:
 																			</div>
-																			<div className="text-sm p-3 border rounded whitespace-pre-wrap max-h-40 overflow-y-auto bg-muted/10">
-																				{typeof groundTruth ===
-																				"string"
-																					? groundTruth
-																					: typeof groundTruth.content ===
-																							"string"
-																						? groundTruth.content
-																						: Array.isArray(
-																									groundTruth.content,
-																								)
-																							? groundTruth.content
-																									.filter(
-																										(part: {
-																											type: string;
-																											text?: string;
-																										}) =>
-																											part.type ===
-																											"text",
-																									)
-																									.map(
-																										(part: {
-																											type: string;
-																											text?: string;
-																										}) =>
-																											part.text,
-																									)
-																									.join(
-																										"",
-																									)
-																							: JSON.stringify(
-																									groundTruth.content,
-																								)}
+																			<div className="max-h-60 overflow-y-auto border border-input rounded-md p-3 bg-background shadow-sm">
+																				<MessageDisplay
+																					sample={
+																						sample
+																					}
+																					compact={
+																						false
+																					}
+																				/>
 																			</div>
 																		</div>
 																	)}
+																	<div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+																		<div>
+																			<div className="text-xs font-medium text-muted-foreground mb-1">
+																				Model
+																				Response:
+																			</div>
+																			<div className="text-sm p-3 border rounded whitespace-pre-wrap max-h-40 overflow-y-auto bg-muted/10">
+																				{
+																					result
+																				}
+																			</div>
+																		</div>
+																		{groundTruth && (
+																			<div>
+																				<div className="text-xs font-medium text-muted-foreground mb-1">
+																					Expected
+																					Response:
+																				</div>
+																				<div className="text-sm p-3 border rounded whitespace-pre-wrap max-h-40 overflow-y-auto bg-muted/10">
+																					{(() => {
+																						const content =
+																							typeof groundTruth ===
+																							"string"
+																								? groundTruth
+																								: groundTruth?.content;
+
+																						if (
+																							typeof content ===
+																							"string"
+																						)
+																							return content;
+																						if (
+																							content
+																						)
+																							return JSON.stringify(
+																								content,
+																							);
+																						return JSON.stringify(
+																							groundTruth,
+																						);
+																					})()}
+																				</div>
+																			</div>
+																		)}
+																	</div>
 																</div>
-															</div>
-														);
-													},
-												)}
+															);
+														},
+													)}
+												</div>
 											</div>
 										)}
-									</div>
-								)}
+								</div>
+							)}
 						</div>
 					)}
 				</div>

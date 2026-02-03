@@ -3,7 +3,9 @@ import { INFERENCE_SERVICE_URL } from "../env";
 import { backendFetch } from "../utils";
 
 // Set to true to enable mock mode for testing UI without backend
-const MOCK_MODE = true;
+const MOCK_MODE =
+	process.env.MOCK_BACKEND_MODE === "true" &&
+	process.env.NODE_ENV === "development";
 
 export async function POST(request: Request) {
 	try {

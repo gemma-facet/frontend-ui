@@ -62,7 +62,7 @@ export interface EvaluationRequest {
 
 export interface SampleResult {
 	prediction: string;
-	reference: string;
+	reference: string | DatasetMessage;
 	sample_index: number;
 	input?: Array<DatasetMessage>;
 }
