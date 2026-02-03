@@ -54,9 +54,7 @@ export async function POST(request: Request) {
 
 		// MOCK MODE: Return fake data for UI testing
 		if (MOCK_MODE) {
-			console.log(
-				"🎭 Mock mode enabled - returning fake evaluation data",
-			);
+			console.log("Mock mode enabled - returning fake evaluation data");
 
 			// Simulate processing delay
 			await new Promise(resolve => setTimeout(resolve, 1500));

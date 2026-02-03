@@ -9,6 +9,115 @@ export async function GET(
 	try {
 		const { id } = await context.params;
 
+		// MOCK MODE: Return fake dataset data for UI testing
+		const MOCK_MODE = true;
+		if (MOCK_MODE) {
+			console.log(
+				`Mock mode enabled - returning fake dataset data for ${id}`,
+			);
+			return NextResponse.json({
+				dataset_name: id,
+				dataset_subset: "default",
+				processed_dataset_id: id,
+				dataset_source: "huggingface",
+				dataset_id: id,
+				created_at: new Date().toISOString(),
+				modality: "text",
+				splits: [
+					{
+						split_name: "train",
+						num_rows: 100,
+						path: "train.jsonl",
+						samples: [
+							{
+								messages: [
+									{
+										role: "user",
+										content:
+											"What is the capital of France?",
+									},
+									{
+										role: "assistant",
+										content:
+											"The capital of France is Paris.",
+									},
+								],
+							},
+							{
+								messages: [
+									{
+										role: "user",
+										content: "Explain photosynthesis.",
+									},
+									{
+										role: "assistant",
+										content:
+											"Photosynthesis is the process used by plants to convert light energy into chemical energy.",
+									},
+								],
+							},
+							{
+								messages: [
+									{
+										role: "user",
+										content:
+											"What are the states of matter?",
+									},
+									{
+										role: "assistant",
+										content: "Solid, liquid, and gas.",
+									},
+								],
+							},
+							{
+								messages: [
+									{
+										role: "user",
+										content: "Who wrote Romeo and Juliet?",
+									},
+									{
+										role: "assistant",
+										content: "William Shakespeare.",
+									},
+								],
+							},
+							{
+								messages: [
+									{
+										role: "user",
+										content: "What is the largest planet?",
+									},
+									{
+										role: "assistant",
+										content: "Jupiter.",
+									},
+								],
+							},
+						],
+					},
+					{
+						split_name: "test",
+						num_rows: 20,
+						path: "test.jsonl",
+						samples: [
+							{
+								messages: [
+									{
+										role: "user",
+										content: "Sample test question 1?",
+									},
+									{
+										role: "assistant",
+										content: "Sample test answer 1.",
+									},
+								],
+							},
+						],
+					},
+				],
+			});
+		}
+
 		const response = await backendFetch(
 			request,
 			`${API_GATEWAY_URL}/datasets/${id}`,

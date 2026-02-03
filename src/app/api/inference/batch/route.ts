@@ -25,6 +25,35 @@ export async function POST(request: Request) {
 			);
 		}
 
+		// MOCK MODE: Return fake inference results for UI testing
+		const MOCK_MODE = true;
+		if (MOCK_MODE) {
+			console.log(
+				"Mock mode enabled - returning fake batch inference data",
+			);
+
+			// Simulate processing delay
+			await new Promise(resolve => setTimeout(resolve, 1500));
+
+			const mockResults = body.messages.map((msgList, idx) => {
+				const lastUserMsg = [...msgList]
+					.reverse()
+					.find(m => m.role === "user");
+				const content =
+					typeof lastUserMsg?.content === "string"
+						? lastUserMsg.content
+						: "Generated response for complex query";
+
+				return `[MOCK RESPONSE for Sample ${idx + 1}] This is a simulated response to your query: "${content.substring(0, 50)}${content.length > 50 ? "..." : ""}". The model is working correctly in mock mode.`;
+			});
+
+			const mockResponse: BatchInferenceResponse = {
+				results: mockResults,
+			};
+
+			return NextResponse.json(mockResponse);
+		}
+
 		const provider = body.base_model_id.split("/")[0];
 		if (provider === "huggingface" && !body.hf_token) {
 			return NextResponse.json(
