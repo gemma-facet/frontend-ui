@@ -269,31 +269,28 @@ export default function EvaluationsPage() {
 				{step === 3 &&
 					selectedMode &&
 					(comparisonModels.isComparison ? (
-						<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-							<UnifiedEvaluationForm
-								{...getModelConfig(
+						<UnifiedEvaluationForm
+							evaluationMode={selectedMode}
+							isComparison
+							model1Config={
+								getModelConfig(
 									comparisonModels.model1,
 									detailedJob1,
-								)}
-								evaluationMode={selectedMode}
-								isComparison
-								isComparisonMaster
-								modelLabel="Model 1"
-								onDatasetChange={setSharedDatasetId}
-								onSamplesChange={setSharedSamples}
-							/>
-							<UnifiedEvaluationForm
-								{...getModelConfig(
+								) || undefined
+							}
+							model2Config={
+								getModelConfig(
 									comparisonModels.model2,
 									detailedJob2,
-								)}
-								evaluationMode={selectedMode}
-								isComparison
-								modelLabel="Model 2"
-								sharedDatasetId={sharedDatasetId}
-								preSelectedSamples={sharedSamples}
-							/>
-						</div>
+								) || undefined
+							}
+							initialDatasetId={
+								getModelConfig(
+									comparisonModels.model1,
+									detailedJob1,
+								)?.initialDatasetId
+							}
+						/>
 					) : (
 						<UnifiedEvaluationForm
 							{...getModelConfig(selectedModel, detailedJob)}
