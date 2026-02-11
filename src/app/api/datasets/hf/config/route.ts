@@ -29,7 +29,6 @@ export async function POST(request: Request) {
 			return NextResponse.json({ error: data.error }, { status: 400 });
 		}
 
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		const uniqueConfigs = [
 			...new Set(
 				data.splits.map((split: { config: string }) => split.config),

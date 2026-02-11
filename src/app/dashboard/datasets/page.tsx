@@ -59,7 +59,7 @@ const Datasets = () => {
 							key={
 								dataset.datasetId ||
 								dataset.processed_dataset_id ||
-								`dataset-${index}`
+								`dataset-${index}` // needed this to fix non unique key error
 							}
 							dataset={dataset}
 						/>

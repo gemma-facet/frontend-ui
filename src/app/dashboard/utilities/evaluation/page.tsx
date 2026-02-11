@@ -90,6 +90,7 @@ export default function EvaluationsPage() {
 				model.type === "base" ? model.useQuantization : undefined,
 			usePreTrained:
 				model.type === "base" ? model.usePreTrained : undefined,
+			// Pre-fill the dataset ID from the training job for better UX
 			initialDatasetId:
 				model.type === "trained"
 					? jobDetails?.processed_dataset_id ||
@@ -284,6 +285,7 @@ export default function EvaluationsPage() {
 									detailedJob2,
 								) || undefined
 							}
+							// Pre-fill the dataset ID from the training job for better UX
 							initialDatasetId={
 								getModelConfig(
 									comparisonModels.model1,
