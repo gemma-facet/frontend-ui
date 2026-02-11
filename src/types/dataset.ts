@@ -1,3 +1,12 @@
+import type {
+	DatasetMessage as DatasetMessageType,
+	DatasetSample as DatasetSampleType,
+	DatasetSynthesisRequest,
+	ImageContentPart as ImageContentPartType,
+	MessageContent as MessageContentType,
+	TextContentPart as TextContentPartType,
+} from "@/schemas/dataset";
+
 // Dataset Types
 export type Dataset = {
 	datasetName: string;
@@ -18,37 +27,13 @@ export type DatasetsState = {
 	hasFetched: boolean;
 };
 
-export interface TextContentPart {
-	type: "text";
-	text: string;
-}
+// Re-export types from Zod schemas
+export type TextContentPart = TextContentPartType;
+export type ImageContentPart = ImageContentPartType;
+export type MessageContent = MessageContentType;
+export type DatasetMessage = DatasetMessageType;
+export type DatasetSample = DatasetSampleType;
 
-export interface ImageContentPart {
-	type: "image";
-	image: string;
-}
-
-export type MessageContent = string | (TextContentPart | ImageContentPart)[];
-
-export interface DatasetMessage {
-	content: MessageContent;
-	role: "system" | "user" | "assistant";
-}
-
-export interface DatasetSample {
-	// Conversation format (existing)
-	messages?: DatasetMessage[];
-
-	// Prompt-only format (inference only, no ground truth)
-	prompt?: DatasetMessage[];
-
-	// Preference format
-	chosen?: DatasetMessage[];
-	rejected?: DatasetMessage[];
-
-	// Additional dynamic fields based on user field mappings
-	[key: string]: unknown;
-}
 export interface DatasetSplit {
 	split_name: string;
 	num_rows: number;
@@ -109,20 +94,7 @@ export interface RawDatasetsResponse {
 	datasets: RawDatasetInfo[];
 }
 
-export interface SynthesisConfig {
-	/**Configuration for dataset synthesis using synthetic-data-kit */
-
-	// Dataset metadata
-	dataset_name: string; // Name of the dataset (compulsory)
-	multimodal?: boolean; // Whether to include multimodal data
-
-	// Generation parameters
-	num_pairs?: number; // Number of QA pairs to generate per chunk
-	temperature?: number; // LLM temperature (0.0-1.0)
-	chunk_size?: number; // Size of text chunks for processing
-	chunk_overlap?: number; // Overlap between chunks
-
-	// Curation parameters
-	threshold?: number; // Quality threshold for curation (1-10)
-	batch_size?: number; // Number of items per batch for rating
-}
+// Re-export Synthesis Config from Schema
+// Note: The schema name is DatasetSynthesisRequest (which matches the body payload)
+// but the UI type was SynthesisConfig. We alias it for compatibility.
+export type SynthesisConfig = DatasetSynthesisRequest;

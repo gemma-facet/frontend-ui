@@ -1,25 +1,27 @@
+import { validateRequest, validationErrorResponse } from "@/lib/api-validation";
+import { TrainRequestSchema } from "@/schemas/training";
 import { NextResponse } from "next/server";
 import { API_GATEWAY_URL } from "../env";
 import { backendFetch } from "../utils";
 
 export async function POST(request: Request) {
+	// 1. Runtime Validation
+	const validation = await validateRequest(request, TrainRequestSchema);
+
+	if (!validation.success) {
+		return validationErrorResponse(validation.error);
+	}
+
+	const body = validation.data;
+
 	try {
-		const requestBody = await request.json();
-
-		const hf_token = requestBody.hf_token;
-
-		if (!hf_token) {
-			return NextResponse.json(
-				{ error: "HuggingFace API Key is required." },
-				{ status: 400 },
-			);
-		}
+		// Schema validation ensures hf_token and required fields are present
 
 		const backendPayload = {
-			processed_dataset_id: requestBody.processed_dataset_id,
-			job_name: requestBody.job_name,
-			hf_token: hf_token,
-			training_config: requestBody.training_config,
+			processed_dataset_id: body.processed_dataset_id,
+			job_name: body.job_name,
+			hf_token: body.hf_token,
+			training_config: body.training_config,
 		};
 
 		const response = await backendFetch(

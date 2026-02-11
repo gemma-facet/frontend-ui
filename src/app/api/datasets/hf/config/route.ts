@@ -1,23 +1,18 @@
+import { validateRequest, validationErrorResponse } from "@/lib/api-validation";
+import { HFConfigSchema } from "@/schemas/dataset";
 import { NextResponse } from "next/server";
 
 export async function POST(request: Request) {
+	// 1. Runtime Validation
+	const validation = await validateRequest(request, HFConfigSchema);
+
+	if (!validation.success) {
+		return validationErrorResponse(validation.error);
+	}
+
+	const { dataset_id, token } = validation.data;
+
 	try {
-		const { dataset_id, token } = await request.json();
-
-		if (!dataset_id) {
-			return NextResponse.json(
-				{ error: "Dataset ID is required" },
-				{ status: 400 },
-			);
-		}
-
-		if (!token) {
-			return NextResponse.json(
-				{ error: "Token is required" },
-				{ status: 400 },
-			);
-		}
-
 		const response = await fetch(
 			`https://datasets-server.huggingface.co/splits?dataset=${dataset_id}`,
 			{
@@ -34,6 +29,7 @@ export async function POST(request: Request) {
 			return NextResponse.json({ error: data.error }, { status: 400 });
 		}
 
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		const uniqueConfigs = [
 			...new Set(
 				data.splits.map((split: { config: string }) => split.config),
@@ -42,7 +38,6 @@ export async function POST(request: Request) {
 
 		return NextResponse.json({ configs: uniqueConfigs });
 	} catch (error) {
-		console.error("Error processing dataset:", error);
 		console.error("Error processing dataset:", error);
 		return NextResponse.json(
 			{ error: "Internal server error" },

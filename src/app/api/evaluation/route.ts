@@ -1,45 +1,26 @@
-import type { EvaluationRequest, EvaluationResponse } from "@/types/inference";
+import { validateRequest, validationErrorResponse } from "@/lib/api-validation";
+import { EvaluationRequestSchema } from "@/schemas/inference";
+import type { EvaluationResponse } from "@/types/inference";
 import { INFERENCE_SERVICE_URL } from "../env";
 import { backendFetch } from "../utils";
 
 export async function POST(request: Request) {
+	const validation = await validateRequest(request, EvaluationRequestSchema);
+
+	if (!validation.success) {
+		return validationErrorResponse(validation.error);
+	}
+
+	const body = validation.data;
+
 	try {
-		const body = (await request.json()) as EvaluationRequest;
+		// Schema validation handles:
+		// 1. Required fields
+		// 2. hf_token conditional logic
+		// 3. Mutual exclusivity of task_type and metrics
 
-		// Validate required fields
-		if (
-			!body.model_source ||
-			!body.model_type ||
-			!body.base_model_id ||
-			!body.dataset_id
-		) {
-			return Response.json(
-				{
-					error: "model_source, model_type, base_model_id, and dataset_id are required",
-				},
-				{ status: 400 },
-			);
-		}
-
-		const baseModelParts = body.base_model_id.split("/");
-		const provider =
-			baseModelParts[0] === "unsloth" ? "unsloth" : "huggingface";
-
-		if (provider === "huggingface" && !body.hf_token) {
-			return Response.json(
-				{ error: "hf_token is required for Hugging Face models" },
-				{ status: 400 },
-			);
-		}
-
-		// Validate mutually exclusive options
-		if (body.task_type && body.metrics) {
-			return Response.json(
-				{ error: "task_type and metrics are mutually exclusive" },
-				{ status: 400 },
-			);
-		}
-
+		// Additional custom check: Either task_type OR metrics must be present
+		// The schema ensures they aren't BOTH present, but we also need to ensure ONE is present
 		if (!body.task_type && (!body.metrics || body.metrics.length === 0)) {
 			return Response.json(
 				{

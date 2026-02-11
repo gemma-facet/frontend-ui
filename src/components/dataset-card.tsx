@@ -36,7 +36,7 @@ const DatasetCard = ({ dataset }: { dataset: Dataset }) => {
 					<p>
 						Splits:{" "}
 						<span className="font-medium text-foreground">
-							{dataset.splits.join(", ")}
+							{dataset.splits?.join(", ") ?? "N/A"}
 						</span>
 					</p>
 					<p>
