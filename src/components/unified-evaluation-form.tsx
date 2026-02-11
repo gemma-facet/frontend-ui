@@ -107,6 +107,24 @@ function getSampleKey(sample: DatasetSample): string {
 	}
 }
 
+// Helper to safely format content (reference/ground truth) that might be a string or a DatasetMessage object.
+// This handles runtime type differences between metrics evaluation and batch inference modes.
+function formatContent(
+	val:
+		| string
+		| DatasetMessage
+		| null
+		| undefined
+		| { content?: string | unknown },
+): string {
+	if (val === null || val === undefined) return "";
+	if (typeof val === "string") return val;
+	const content = val.content;
+	if (typeof content === "string") return content;
+	if (content) return JSON.stringify(content);
+	return JSON.stringify(val);
+}
+
 export default function UnifiedEvaluationForm({
 	job,
 	modelSource,
@@ -1135,28 +1153,9 @@ export default function UnifiedEvaluationForm({
 																		: "Ground Truth"}
 																</div>
 																<div className="text-sm whitespace-pre-wrap max-h-24 overflow-y-auto">
-																	{(() => {
-																		const content =
-																			typeof ref ===
-																			"string"
-																				? ref
-																				: ref?.content;
-
-																		if (
-																			typeof content ===
-																			"string"
-																		)
-																			return content;
-																		if (
-																			content
-																		)
-																			return JSON.stringify(
-																				content,
-																			);
-																		return JSON.stringify(
-																			ref,
-																		);
-																	})()}
+																	{formatContent(
+																		ref,
+																	)}
 																</div>
 															</div>
 														)}
@@ -1282,23 +1281,9 @@ export default function UnifiedEvaluationForm({
 																		Reference
 																	</div>
 																	<div className="text-sm whitespace-pre-wrap max-h-24 overflow-y-auto">
-																		{(() => {
-																			const content =
-																				typeof sample.reference ===
-																				"string"
-																					? sample.reference
-																					: sample
-																							.reference
-																							?.content;
-
-																			return typeof content ===
-																				"string"
-																				? content
-																				: JSON.stringify(
-																						content ||
-																							sample.reference,
-																					);
-																		})()}
+																		{formatContent(
+																			sample.reference,
+																		)}
 																	</div>
 																</div>
 
@@ -1388,28 +1373,9 @@ export default function UnifiedEvaluationForm({
 																					Response:
 																				</div>
 																				<div className="text-sm p-3 border rounded whitespace-pre-wrap max-h-40 overflow-y-auto bg-muted/10">
-																					{(() => {
-																						const content =
-																							typeof groundTruth ===
-																							"string"
-																								? groundTruth
-																								: groundTruth?.content;
-
-																						if (
-																							typeof content ===
-																							"string"
-																						)
-																							return content;
-																						if (
-																							content
-																						)
-																							return JSON.stringify(
-																								content,
-																							);
-																						return JSON.stringify(
-																							groundTruth,
-																						);
-																					})()}
+																					{formatContent(
+																						groundTruth,
+																					)}
 																				</div>
 																			</div>
 																		)}
