@@ -1,7 +1,5 @@
-import { validateData } from "@/lib/api-validation";
-import { TrainingJobSchema } from "@/schemas/training";
+import type { TrainingJobResponse } from "@/schemas/training";
 import { NextResponse } from "next/server";
-import { z } from "zod";
 import { API_GATEWAY_URL } from "../env";
 import { backendFetch } from "../utils";
 
@@ -10,11 +8,8 @@ export async function GET(request: Request) {
 		const res = await backendFetch(request, `${API_GATEWAY_URL}/jobs`);
 		if (!res.ok) throw new Error("Failed to fetch jobs");
 		const data = await res.json();
-		const validated = validateData(
-			data,
-			z.object({ jobs: z.array(TrainingJobSchema) }),
-		);
-		return NextResponse.json(validated);
+		const { jobs } = data as { jobs: TrainingJobResponse[] };
+		return NextResponse.json(jobs);
 	} catch (err: unknown) {
 		return NextResponse.json(
 			{

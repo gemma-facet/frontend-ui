@@ -2,39 +2,12 @@
 
 import ExportJobCard from "@/components/export-job-card";
 import { Button } from "@/components/ui/button";
+import { useExports } from "@/hooks/useExports";
 import { cn } from "@/lib/utils";
-import type { ExportJobListEntry } from "@/types/export";
 import { Loader2, RefreshCcw } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
 
 const ExportPage = () => {
-	const [jobs, setJobs] = useState<ExportJobListEntry[]>([]);
-	const [loading, setLoading] = useState(false);
-	const [error, setError] = useState<string | null>(null);
-
-	const refresh = useCallback(async () => {
-		setLoading(true);
-		setError(null);
-
-		try {
-			const response = await fetch("/api/exports");
-			if (!response.ok) {
-				throw new Error("Failed to fetch export jobs");
-			}
-
-			const data: ExportJobListEntry[] = await response.json();
-			setJobs(data);
-		} catch (err: unknown) {
-			setError(err instanceof Error ? err.message : "Unknown error");
-		} finally {
-			setLoading(false);
-		}
-	}, []);
-
-	// Refresh on page visit
-	useEffect(() => {
-		refresh();
-	}, [refresh]);
+	const { jobs, loading, error, refresh } = useExports();
 
 	return (
 		<div>

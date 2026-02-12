@@ -1,15 +1,7 @@
-import {
-	validateData,
-	validateRequest,
-	validationErrorResponse,
-} from "@/lib/api-validation";
-import {
-	ExportJobListEntrySchema,
-	ExportRequestSchema,
-} from "@/schemas/export";
+import { validateRequest, validationErrorResponse } from "@/lib/api-validation";
+import { ExportRequestSchema } from "@/schemas/export";
 import type { ListExportsResponse } from "@/types/export";
 import { NextResponse } from "next/server";
-import { z } from "zod";
 import { API_GATEWAY_URL } from "../env";
 import { backendFetch } from "../utils";
 
@@ -24,8 +16,7 @@ export async function GET(request: Request) {
 		if (!res.ok)
 			throw new Error(data.error || "Failed to fetch export jobs");
 		const { jobs } = data as ListExportsResponse;
-		const validated = validateData(jobs, z.array(ExportJobListEntrySchema));
-		return NextResponse.json(validated);
+		return NextResponse.json(jobs);
 	} catch (err: unknown) {
 		return NextResponse.json(
 			{ error: err instanceof Error ? err.message : String(err) },

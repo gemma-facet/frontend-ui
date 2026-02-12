@@ -1,6 +1,7 @@
 import type {
 	DatasetMessage as DatasetMessageType,
 	DatasetSample as DatasetSampleType,
+	// DatasetProcessRequest not imported here?
 	DatasetSynthesisRequest,
 	ImageContentPart as ImageContentPartType,
 	MessageContent as MessageContentType,
@@ -98,3 +99,6 @@ export interface RawDatasetsResponse {
 // Note: The schema name is DatasetSynthesisRequest (which matches the body payload)
 // but the UI type was SynthesisConfig. We alias it for compatibility.
 export type SynthesisConfig = DatasetSynthesisRequest;
+
+import type { DatasetProcessRequest as DatasetProcessRequestType } from "@/schemas/dataset";
+export type DatasetProcessRequest = DatasetProcessRequestType;

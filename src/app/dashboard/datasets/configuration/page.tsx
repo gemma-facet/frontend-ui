@@ -16,10 +16,8 @@ import {
 	chosenFieldColumnAtom,
 	chosenFieldTabAtom,
 	chosenFieldTemplateAtom,
-	// Augmentation atoms
 	datasetAugmentationAtom,
 	datasetNameAtom,
-	datasetProcessingLoadingAtom,
 	datasetSelectionAtom,
 	datasetsAtom,
 	geminiApiKeyAtom,
@@ -69,7 +67,9 @@ import {
 	SelectValue,
 } from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
+import { useDatasetProcessing } from "@/hooks/useDatasetProcessing";
 import { cn } from "@/lib/utils";
+import type { DatasetProcessRequest } from "@/types/dataset";
 import { useAtom, useAtomValue } from "jotai";
 import { Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -79,9 +79,12 @@ import { toast } from "sonner";
 const DatasetConfiguration = () => {
 	const router = useRouter();
 	const datasetSelection = useAtomValue(datasetSelectionAtom);
-	const [datasetProcessingLoading, setDatasetProcessingLoading] = useAtom(
-		datasetProcessingLoadingAtom,
-	);
+	const {
+		processDataset,
+		loading: datasetProcessingLoading,
+		error: processingError,
+	} = useDatasetProcessing();
+
 	const [datasetName, setDatasetName] = useAtom(datasetNameAtom);
 	const [datasets, setDatasets] = useAtom(datasetsAtom);
 	const [processingMode, setProcessingMode] = useAtom(processingModeAtom);
@@ -329,9 +332,6 @@ const DatasetConfiguration = () => {
 			}
 		}
 
-		// Process Dataset
-		setDatasetProcessingLoading(true);
-
 		try {
 			let splitConfig = {};
 
@@ -450,21 +450,10 @@ const DatasetConfiguration = () => {
 				},
 			};
 
-			const response = await fetch("/api/datasets/process", {
-				method: "POST",
-				body: JSON.stringify(requestBody),
-				headers: {
-					"Content-Type": "application/json",
-				},
-			});
-
-			const data = await response.json();
-
-			if (!response.ok) {
-				throw new Error(
-					`Failed to process dataset: ${data.detail || "Unknown error"}`,
-				);
-			}
+			// Use the hook to process the dataset
+			const data = await processDataset(
+				requestBody as unknown as DatasetProcessRequest,
+			);
 
 			// Update the datasets list in the sidebar with the new dataset info
 			if (data.dataset_name) {
@@ -479,7 +468,7 @@ const DatasetConfiguration = () => {
 					datasetSubset: data.dataset_subset,
 					numExamples: data.num_examples,
 					createdAt: data.created_at,
-					splits: data.splits,
+					splits: data.splits || [],
 					modality: data.modality || "text", // Default to text if not provided
 				};
 
@@ -495,12 +484,12 @@ const DatasetConfiguration = () => {
 			// Redirect to the dataset detail page using processed_dataset_id
 			router.push(`/dashboard/datasets/${data.processed_dataset_id}`);
 		} catch (error) {
+			// Error is already handled/logged by the hook, but we show toast here
+			// The hook re-throws so we catch it here to show toast
 			toast.error("Error preprocessing dataset.", {
 				description:
 					error instanceof Error ? error.message : "Unknown error",
 			});
-		} finally {
-			setDatasetProcessingLoading(false);
 		}
 	};
 

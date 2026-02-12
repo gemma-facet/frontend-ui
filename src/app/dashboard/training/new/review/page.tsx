@@ -17,12 +17,13 @@ import {
 	CardHeader,
 	CardTitle,
 } from "@/components/ui/card";
+import { useTrainingMutation } from "@/hooks/useTrainingMutation";
 import { constructFullModelId } from "@/lib/models";
 import { useAtom } from "jotai";
 import { Pencil } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { toast } from "sonner";
 
 export default function TrainingReviewPage() {
@@ -32,9 +33,19 @@ export default function TrainingReviewPage() {
 	const [config] = useAtom(trainingConfigAtom);
 	const [jobName] = useAtom(trainingJobNameAtom);
 	const [hfToken] = useAtom(trainingHfTokenAtom);
+
 	const router = useRouter();
-	const [submitting, setSubmitting] = useState(false);
-	const [error, setError] = useState<string | null>(null);
+	const {
+		submitTrainingJob,
+		loading: submitting,
+		error: mutationError,
+	} = useTrainingMutation();
+	// We can use local error state if we want to display it differently or use hook's error directly
+	// The original code used a local error state. Let's keep using the hook's error but we might need
+	// to display it.
+	// Actually, the original code set error state on catch.
+	// The hook also sets error state.
+	// We can use the hook's error.
 
 	useEffect(() => {
 		if (!model) {
@@ -56,14 +67,13 @@ export default function TrainingReviewPage() {
 	const exportDestination = config.export_config.destination || "gcs";
 
 	const handleSubmit = async () => {
-		setSubmitting(true);
-
 		if (!hfToken) {
 			toast.error("HuggingFace API Key is required.");
-			throw new Error("HuggingFace API Key is required.");
+			// We can't throw here if we want to stay in the function flow,
+			// but original threw error.
+			return;
 		}
 
-		setError(null);
 		try {
 			// Construct the full model ID with training type suffix and proper provider/quantization
 			const baseModelWithType = `${model.modelId}-${model.trainingType}`;
@@ -80,17 +90,15 @@ export default function TrainingReviewPage() {
 				training_config: config,
 			};
 
-			const res = await fetch("/api/train", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify(payload),
-			});
-			if (!res.ok) throw new Error("Failed to submit job");
+			await submitTrainingJob(payload);
+			// If successful (no error thrown), redirect
 			router.push("/dashboard/training");
 		} catch (err: unknown) {
-			setError(err instanceof Error ? err.message : String(err));
-		} finally {
-			setSubmitting(false);
+			// Error is maintained in hook state, but we can also toast or log here
+			console.error("Submission failed", err);
+			// The hook throws, so we catch it here.
+			// original code set local error state.
+			// We can rely on hook's error state for the UI alert.
 		}
 	};
 
@@ -223,9 +231,9 @@ export default function TrainingReviewPage() {
 						})}
 					{/* Add more key fields if needed */}
 				</CardContent>
-				{error && (
+				{mutationError && (
 					<p className="text-destructive text-sm px-6 py-2">
-						{error}
+						{mutationError}
 					</p>
 				)}
 				<CardFooter className="flex flex-col md:flex-row gap-4 justify-end">
