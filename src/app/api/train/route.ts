@@ -5,7 +5,6 @@ import { API_GATEWAY_URL } from "../env";
 import { backendFetch } from "../utils";
 
 export async function POST(request: Request) {
-	// 1. Runtime Validation
 	const validation = await validateRequest(request, TrainRequestSchema);
 
 	if (!validation.success) {

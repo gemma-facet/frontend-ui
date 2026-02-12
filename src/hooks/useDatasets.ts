@@ -1,20 +1,10 @@
 "use client";
 
+import { DatasetSchema } from "@/schemas/dataset";
 import { useAtom } from "jotai";
 import { useCallback, useEffect, useRef } from "react";
+import { z } from "zod";
 import { datasetsAtom } from "../atoms";
-
-interface ApiDataset {
-	dataset_name: string;
-	dataset_id: string;
-	processed_dataset_id: string;
-	dataset_source: "upload" | "huggingface";
-	dataset_subset: string;
-	num_examples: number;
-	created_at: string;
-	splits?: string[];
-	modality: "text" | "vision";
-}
 
 export function useDatasets() {
 	const [state, setState] = useAtom(datasetsAtom);
@@ -39,15 +29,17 @@ export function useDatasets() {
 			}
 
 			const data = await res.json();
+			const validatedDatasets = z
+				.array(DatasetSchema)
+				.parse(data.datasets);
 
-			const formattedData = data.datasets.map((dataset: ApiDataset) => ({
+			const formattedData = validatedDatasets.map(dataset => ({
 				datasetName: dataset.dataset_name,
 				datasetId: dataset.dataset_id,
 				processed_dataset_id: dataset.processed_dataset_id,
-				datasetSource:
-					dataset.dataset_source === "upload"
-						? "local"
-						: "huggingface",
+				datasetSource: (dataset.dataset_source === "upload"
+					? "local"
+					: "huggingface") as "local" | "huggingface",
 				datasetSubset: dataset.dataset_subset,
 				numExamples: dataset.num_examples,
 				createdAt: dataset.created_at,

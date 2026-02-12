@@ -1,3 +1,4 @@
+import { DatasetDetailSchema } from "@/schemas/dataset";
 import type { DatasetDetail, DatasetDetailState } from "@/types/dataset";
 import { useEffect, useState } from "react";
 
@@ -32,9 +33,10 @@ export const useDatasetDetail = (processedDatasetId: string) => {
 					);
 				}
 
-				const data: DatasetDetail = await response.json();
+				const data = await response.json();
+				const validated = DatasetDetailSchema.parse(data);
 				setState({
-					data,
+					data: validated as DatasetDetail,
 					loading: false,
 					error: null,
 				});

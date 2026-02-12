@@ -101,3 +101,40 @@ export type HFInfoRequest = z.infer<typeof HFInfoSchema>;
 export type HFPreviewRequest = z.infer<typeof HFPreviewSchema>;
 export type DatasetProcessRequest = z.infer<typeof DatasetProcessSchema>;
 export type DatasetSynthesisRequest = z.infer<typeof DatasetSynthesisSchema>;
+
+// --- Response Schemas ---
+
+export const DatasetSchema = z.object({
+	dataset_name: z.string(),
+	dataset_id: z.string(),
+	processed_dataset_id: z.string(),
+	dataset_source: z.enum(["upload", "huggingface"]),
+	dataset_subset: z.string(),
+	num_examples: z.number(),
+	created_at: z.string(),
+	splits: z.array(z.string()).optional(),
+	modality: z.enum(["text", "vision"]),
+});
+
+// Helper for DatasetDetail splits
+export const DatasetSplitSchema = z.object({
+	split_name: z.string(),
+	num_rows: z.number(),
+	path: z.string(),
+	// PERFORMANCE: Use z.any() or minimal validation for samples to avoid parsing overhead on large datasets
+	samples: z.array(z.any()),
+});
+
+export const DatasetDetailSchema = z.object({
+	dataset_name: z.string(),
+	dataset_subset: z.string(),
+	processed_dataset_id: z.string(),
+	dataset_source: z.enum(["upload", "huggingface"]),
+	dataset_id: z.string(),
+	created_at: z.string(),
+	modality: z.enum(["text", "vision"]),
+	splits: z.array(DatasetSplitSchema),
+});
+
+export type DatasetResponse = z.infer<typeof DatasetSchema>;
+export type DatasetDetailResponse = z.infer<typeof DatasetDetailSchema>;

@@ -6,7 +6,6 @@ import { backendFetch } from "../../utils";
 
 // POST /api/datasets/process - Process uploaded dataset
 export async function POST(request: Request) {
-	// 1. Runtime Validation
 	const validation = await validateRequest(request, DatasetProcessSchema);
 
 	if (!validation.success) {

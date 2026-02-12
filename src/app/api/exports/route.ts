@@ -1,7 +1,11 @@
 import { validateRequest, validationErrorResponse } from "@/lib/api-validation";
-import { ExportRequestSchema } from "@/schemas/export";
+import {
+	ExportJobListEntrySchema,
+	ExportRequestSchema,
+} from "@/schemas/export";
 import type { ListExportsResponse } from "@/types/export";
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { API_GATEWAY_URL } from "../env";
 import { backendFetch } from "../utils";
 
@@ -16,7 +20,8 @@ export async function GET(request: Request) {
 		if (!res.ok)
 			throw new Error(data.error || "Failed to fetch export jobs");
 		const { jobs } = data as ListExportsResponse;
-		return NextResponse.json(jobs);
+		const validated = z.array(ExportJobListEntrySchema).parse(jobs);
+		return NextResponse.json(validated);
 	} catch (err: unknown) {
 		return NextResponse.json(
 			{ error: err instanceof Error ? err.message : String(err) },
@@ -26,7 +31,6 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-	// 1. Runtime Validation
 	const validation = await validateRequest(request, ExportRequestSchema);
 
 	if (!validation.success) {

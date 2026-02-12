@@ -28,3 +28,44 @@ export const ExportRequestSchema = z
 	);
 
 export type ExportRequest = z.infer<typeof ExportRequestSchema>;
+
+// --- Response Schemas ---
+
+export const JobArtifactsFilesSchema = z.object({
+	adapter: z.string().optional(),
+	merged: z.string().optional(),
+	gguf: z.string().optional(),
+});
+
+export const JobArtifactsRawSchema = z.object({
+	adapter: z.string().optional(),
+	merged: z.string().optional(),
+});
+
+export const JobArtifactsHFSchema = z.object({
+	adapter: z.string().optional(),
+	merged: z.string().optional(),
+	gguf: z.string().optional(),
+});
+
+export const JobArtifactsResponseSchema = z.object({
+	file: JobArtifactsFilesSchema,
+	raw: JobArtifactsRawSchema,
+	hf: JobArtifactsHFSchema,
+});
+
+export const ExportJobListEntrySchema = z.object({
+	job_id: z.string(),
+	job_name: z.string(),
+	base_model_id: z.string(),
+	artifacts: JobArtifactsResponseSchema.optional(),
+});
+
+export const ListExportsResponseSchema = z.object({
+	jobs: z.array(ExportJobListEntrySchema),
+});
+
+export type ExportJobListEntryResponse = z.infer<
+	typeof ExportJobListEntrySchema
+>;
+export type ListExportsResponseData = z.infer<typeof ListExportsResponseSchema>;

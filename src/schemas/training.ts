@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { JobArtifactsResponseSchema } from "./export";
 
 // --- Enums ---
 
@@ -218,3 +219,40 @@ export type EvaluationConfig = z.infer<typeof EvaluationConfigSchema>;
 export type WandbConfig = z.infer<typeof WandbConfigSchema>;
 export type ExportConfig = z.infer<typeof ExportConfigSchema>;
 export type AnyGraderConfig = z.infer<typeof AnyGraderConfigSchema>;
+
+// --- Response Schemas ---
+
+export const EvaluationMetricsSchema = z.object({
+	accuracy: z.number().optional(),
+	perplexity: z.number().optional(),
+	eval_loss: z.number().optional(),
+	eval_runtime: z.number().optional(),
+});
+
+export const TrainingJobSchema = z.object({
+	job_id: z.string(),
+	job_name: z.string().optional(),
+	user_id: z.string().optional(),
+	status: z
+		.enum([
+			"pending",
+			"queued",
+			"preparing",
+			"training",
+			"completed",
+			"failed",
+		])
+		.optional(),
+	processed_dataset_id: z.string().optional(),
+	dataset_id: z.string().optional(),
+	base_model_id: z.string().optional(),
+	created_at: z.string().optional(),
+	updated_at: z.string().optional(),
+	wandb_url: z.string().optional(),
+	artifacts: JobArtifactsResponseSchema.optional(),
+	error: z.string().optional(),
+	modality: z.enum(["text", "vision"]).optional(),
+	metrics: EvaluationMetricsSchema.optional(),
+});
+
+export type TrainingJobResponse = z.infer<typeof TrainingJobSchema>;

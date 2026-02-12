@@ -3,7 +3,6 @@ import { LoginSchema } from "@/schemas/auth";
 import { NextResponse } from "next/server";
 
 export async function POST(request: Request) {
-	// 1. Runtime Validation
 	const validation = await validateRequest(request, LoginSchema);
 
 	if (!validation.success) {
