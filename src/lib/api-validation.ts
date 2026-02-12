@@ -43,3 +43,16 @@ export function formatZodError(error: z.ZodError): string {
 export function validationErrorResponse(error: z.ZodError) {
 	return NextResponse.json({ error: formatZodError(error) }, { status: 400 });
 }
+
+// Helper to validate API response data (safe parsing)
+export function validateData<T>(data: unknown, schema: z.Schema<T>): T {
+	const result = schema.safeParse(data);
+
+	if (!result.success) {
+		const errorMessage = formatZodError(result.error);
+		console.error(`[API Response Validation Error]: ${errorMessage}`);
+		throw new Error(`Response validation failed: ${errorMessage}`);
+	}
+
+	return result.data;
+}

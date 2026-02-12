@@ -1,3 +1,4 @@
+import { validateData } from "@/lib/api-validation";
 import { DatasetDetailSchema } from "@/schemas/dataset";
 import { NextResponse } from "next/server";
 import { API_GATEWAY_URL } from "../../env";
@@ -24,7 +25,7 @@ export async function GET(
 		}
 
 		const data = await response.json();
-		const validated = DatasetDetailSchema.parse(data);
+		const validated = validateData(data, DatasetDetailSchema);
 		return NextResponse.json(validated);
 	} catch (error) {
 		console.error("Failed to fetch dataset:", error);

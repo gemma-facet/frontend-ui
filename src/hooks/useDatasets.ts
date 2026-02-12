@@ -1,5 +1,6 @@
 "use client";
 
+import { validateData } from "@/lib/api-validation";
 import { DatasetSchema } from "@/schemas/dataset";
 import { useAtom } from "jotai";
 import { useCallback, useEffect, useRef } from "react";
@@ -29,9 +30,10 @@ export function useDatasets() {
 			}
 
 			const data = await res.json();
-			const validatedDatasets = z
-				.array(DatasetSchema)
-				.parse(data.datasets);
+			const validatedDatasets = validateData(
+				data.datasets,
+				z.array(DatasetSchema),
+			);
 
 			const formattedData = validatedDatasets.map(dataset => ({
 				datasetName: dataset.dataset_name,

@@ -1,3 +1,4 @@
+import { validateData } from "@/lib/api-validation";
 import { DatasetDetailSchema } from "@/schemas/dataset";
 import type { DatasetDetail, DatasetDetailState } from "@/types/dataset";
 import { useEffect, useState } from "react";
@@ -34,7 +35,7 @@ export const useDatasetDetail = (processedDatasetId: string) => {
 				}
 
 				const data = await response.json();
-				const validated = DatasetDetailSchema.parse(data);
+				const validated = validateData(data, DatasetDetailSchema);
 				setState({
 					data: validated as DatasetDetail,
 					loading: false,

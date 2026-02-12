@@ -1,4 +1,8 @@
-import { validateRequest, validationErrorResponse } from "@/lib/api-validation";
+import {
+	validateData,
+	validateRequest,
+	validationErrorResponse,
+} from "@/lib/api-validation";
 import {
 	ExportJobListEntrySchema,
 	ExportRequestSchema,
@@ -20,7 +24,7 @@ export async function GET(request: Request) {
 		if (!res.ok)
 			throw new Error(data.error || "Failed to fetch export jobs");
 		const { jobs } = data as ListExportsResponse;
-		const validated = z.array(ExportJobListEntrySchema).parse(jobs);
+		const validated = validateData(jobs, z.array(ExportJobListEntrySchema));
 		return NextResponse.json(validated);
 	} catch (err: unknown) {
 		return NextResponse.json(

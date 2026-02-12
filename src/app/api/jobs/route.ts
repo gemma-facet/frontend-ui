@@ -1,3 +1,4 @@
+import { validateData } from "@/lib/api-validation";
 import { TrainingJobSchema } from "@/schemas/training";
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -9,9 +10,10 @@ export async function GET(request: Request) {
 		const res = await backendFetch(request, `${API_GATEWAY_URL}/jobs`);
 		if (!res.ok) throw new Error("Failed to fetch jobs");
 		const data = await res.json();
-		const validated = z
-			.object({ jobs: z.array(TrainingJobSchema) })
-			.parse(data);
+		const validated = validateData(
+			data,
+			z.object({ jobs: z.array(TrainingJobSchema) }),
+		);
 		return NextResponse.json(validated);
 	} catch (err: unknown) {
 		return NextResponse.json(
