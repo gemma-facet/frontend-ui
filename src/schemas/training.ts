@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { JobArtifactsResponseSchema } from "./export";
+import { ExportTypeSchema, JobArtifactsResponseSchema } from "./export";
 
 // --- Enums ---
 
@@ -252,6 +252,15 @@ export const TrainingJobSchema = z.object({
 	artifacts: JobArtifactsResponseSchema.optional(),
 	error: z.string().optional(),
 	modality: z.enum(["text", "vision"]).optional(),
+	// ... existing fields
+	latest_export: z
+		.object({
+			status: z.enum(["pending", "running", "completed", "failed"]),
+			type: ExportTypeSchema,
+			message: z.string().optional(),
+			created_at: z.string().optional(),
+		})
+		.optional(),
 	metrics: EvaluationMetricsSchema.optional(),
 });
 

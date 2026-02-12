@@ -25,7 +25,6 @@ export async function GET(
 		}
 
 		const data: DatasetDetailResponse = await response.json();
-		// const validated = validateData(data, DatasetDetailSchema);
 		return NextResponse.json(data);
 	} catch (error) {
 		console.error("Failed to fetch dataset:", error);

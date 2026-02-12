@@ -52,7 +52,8 @@ const DatasetPage = ({
 }) => {
 	const { datasetName } = use(params);
 	// Use processed_dataset_id for backend operations, but datasetName for URL routing
-	const { data, loading, error } = useDatasetDetail(datasetName);
+	const { data, loading, error, deleteDataset } =
+		useDatasetDetail(datasetName);
 
 	// State for delete operations
 	const [isDeleting, setIsDeleting] = useState(false);
@@ -71,16 +72,7 @@ const DatasetPage = ({
 
 		setIsDeleting(true);
 		try {
-			const response = await fetch(`/api/datasets/${datasetName}`, {
-				method: "DELETE",
-			});
-
-			if (!response.ok) {
-				const errorData = await response.json();
-				throw new Error(errorData.error || "Failed to delete dataset");
-			}
-
-			const deleteData = await response.json();
+			const deleteData = await deleteDataset();
 			setDeleteSuccess(deleteData);
 			setShowDeleteDialog(true);
 

@@ -15,6 +15,7 @@ import {
 	TooltipContent,
 	TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useTrainingJob } from "@/hooks/useTrainingJob";
 import type { JobDeleteResponse, TrainingJob } from "@/types/training";
 import { useSetAtom } from "jotai";
 import { Download, InfoIcon, Loader2, RefreshCw, Trash2 } from "lucide-react";
@@ -28,9 +29,6 @@ export default function JobDetailPage() {
 	const router = useRouter();
 	const jobId = params.jobId as string;
 
-	const [job, setJob] = useState<TrainingJob | null>(null);
-	const [loading, setLoading] = useState(true);
-	const [error, setError] = useState<string | null>(null);
 	const [refreshing, setRefreshing] = useState(false);
 	const setSelectedModel = useSetAtom(selectedModelAtom);
 	const [downloadLoading, setDownloadLoading] = useState(false);
@@ -45,11 +43,6 @@ export default function JobDetailPage() {
 	const cancelled = useRef(false);
 	const polling = useRef<NodeJS.Timeout | null>(null);
 
-	// Detect provider from base model ID
-	const baseModelParts = job?.base_model_id?.split("/");
-	const provider =
-		baseModelParts?.[0] === "unsloth" ? "unsloth" : "huggingface";
-
 	// Load HF token from localStorage
 	useEffect(() => {
 		const storedHfToken =
@@ -61,55 +54,52 @@ export default function JobDetailPage() {
 		}
 	}, []);
 
-	const fetchStatus = useCallback(
-		async (manual = false) => {
-			if (manual) setRefreshing(true);
-			setLoading(true);
-			setError(null);
-			try {
-				const res = await fetch(`/api/jobs/${jobId}`);
-				const data = await res.json();
-				if (res.ok) {
-					setJob(data);
-					if (
-						!manual &&
-						!cancelled.current &&
-						data.status &&
-						!["completed", "failed"].includes(data.status)
-					) {
-						polling.current = setTimeout(() => fetchStatus(), 5000);
-					}
-				} else {
-					setError(data.error || "Failed to fetch job status");
-				}
-			} catch (err: unknown) {
-				setError(err instanceof Error ? err.message : String(err));
-			} finally {
-				setLoading(false);
-				if (manual) setRefreshing(false);
-			}
-		},
-		[jobId],
-	);
+	const {
+		job,
+		loading,
+		error,
+		refresh: fetchStatus,
+		deleteJob,
+	} = useTrainingJob(jobId);
 
+	// Detect provider from base model ID
+	const baseModelParts = job?.base_model_id?.split("/");
+	const provider =
+		baseModelParts?.[0] === "unsloth" ? "unsloth" : "huggingface";
+
+	const handleRefresh = async () => {
+		setRefreshing(true);
+		await fetchStatus(undefined, false); // Force refresh
+		setRefreshing(false);
+	};
+
+	// Polling logic
 	useEffect(() => {
-		cancelled.current = false;
-		fetchStatus();
+		if (
+			job?.status &&
+			!["completed", "failed"].includes(job.status) &&
+			!cancelled.current
+		) {
+			polling.current = setTimeout(
+				() => fetchStatus(undefined, true),
+				5000,
+			);
+		}
 		return () => {
-			cancelled.current = true;
-			if (polling.current) clearTimeout(polling.current);
-		};
-	}, [fetchStatus]);
-
-	useEffect(() => {
-		// stop polling once job is completed or failed
-		if (job && ["completed", "failed"].includes(job.status ?? "")) {
 			if (polling.current) {
 				clearTimeout(polling.current);
 				polling.current = null;
 			}
-		}
-	}, [job]);
+		};
+	}, [job?.status, fetchStatus]);
+
+	useEffect(() => {
+		cancelled.current = false;
+		return () => {
+			cancelled.current = true;
+			if (polling.current) clearTimeout(polling.current);
+		};
+	}, []);
 
 	async function handleDownload(path: string) {
 		if (!path) return;
@@ -148,14 +138,7 @@ export default function JobDetailPage() {
 		setDeleteError(null);
 		setDeleteSuccess(null);
 		try {
-			const res = await fetch(`/api/jobs/${jobId}`, {
-				method: "DELETE",
-			});
-			const data = await res.json();
-
-			if (!res.ok) {
-				throw new Error(data.error || "Failed to delete job");
-			}
+			const data = await deleteJob();
 
 			// Show success popup with deletion details
 			setDeleteSuccess(data);
@@ -257,7 +240,7 @@ export default function JobDetailPage() {
 					<Button
 						variant="outline"
 						size="sm"
-						onClick={() => fetchStatus(true)}
+						onClick={handleRefresh}
 						disabled={refreshing}
 						className="flex items-center gap-2"
 					>

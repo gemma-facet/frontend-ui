@@ -69,3 +69,13 @@ export type ExportJobListEntryResponse = z.infer<
 	typeof ExportJobListEntrySchema
 >;
 export type ListExportsResponseData = z.infer<typeof ListExportsResponseSchema>;
+
+export const ExportResponseSchema = z
+	.object({
+		success: z.boolean().optional(),
+		message: z.string().optional(),
+		job_id: z.string().optional(),
+	})
+	.passthrough();
+
+export type ExportResponse = z.infer<typeof ExportResponseSchema>;

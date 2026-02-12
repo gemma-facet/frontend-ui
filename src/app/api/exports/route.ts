@@ -16,7 +16,7 @@ export async function GET(request: Request) {
 		if (!res.ok)
 			throw new Error(data.error || "Failed to fetch export jobs");
 		const { jobs } = data as ListExportsResponse;
-		return NextResponse.json(jobs);
+		return NextResponse.json({ jobs });
 	} catch (err: unknown) {
 		return NextResponse.json(
 			{ error: err instanceof Error ? err.message : String(err) },

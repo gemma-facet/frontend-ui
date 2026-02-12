@@ -1,4 +1,5 @@
 import { validateData } from "@/lib/api-validation";
+import { DeleteResponseSchema } from "@/schemas/common";
 import { DatasetDetailSchema } from "@/schemas/dataset";
 import type { DatasetDetail, DatasetDetailState } from "@/types/dataset";
 import { useEffect, useState } from "react";
@@ -56,5 +57,25 @@ export const useDatasetDetail = (processedDatasetId: string) => {
 		fetchDatasetDetail();
 	}, [processedDatasetId]);
 
-	return state;
+	const deleteDataset = async () => {
+		const response = await fetch(
+			`/api/datasets/${encodeURIComponent(processedDatasetId)}`,
+			{
+				method: "DELETE",
+			},
+		);
+
+		if (!response.ok) {
+			const errorData = await response.json();
+			throw new Error(errorData.error || "Failed to delete dataset");
+		}
+
+		const validated = validateData(
+			await response.json(),
+			DeleteResponseSchema,
+		);
+		return validated;
+	};
+
+	return { ...state, deleteDataset };
 };

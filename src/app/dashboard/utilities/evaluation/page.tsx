@@ -9,6 +9,7 @@ import EvaluationModeSelector from "@/components/evaluation-mode-selector";
 import ModelSelector from "@/components/model-selector";
 import { Button } from "@/components/ui/button";
 import UnifiedEvaluationForm from "@/components/unified-evaluation-form";
+import { useTrainingJob } from "@/hooks/useTrainingJob";
 import type { DatasetSample } from "@/types/dataset";
 import type { ModelType } from "@/types/inference";
 import type { TrainingJob } from "@/types/training";
@@ -99,17 +100,19 @@ export default function EvaluationsPage() {
 		};
 	};
 
+	const { refresh: fetchJob } = useTrainingJob();
+
 	const handleNext = async () => {
 		if (step === 1 && canProceedToStep2) {
 			const fetchJobDetails = async (model: typeof selectedModel) => {
 				if (model?.type === "trained" && model.job?.job_id) {
-					const res = await fetch(`/api/jobs/${model.job.job_id}`);
-					if (res.ok) {
-						return await res.json();
+					try {
+						return await fetchJob(model.job.job_id);
+					} catch (error) {
+						throw new Error(
+							`Failed to fetch details for job ${model.job.job_id}`,
+						);
 					}
-					throw new Error(
-						`Failed to fetch details for job ${model.job.job_id}`,
-					);
 				}
 				return null;
 			};
