@@ -2,7 +2,7 @@
 
 import { validateData } from "@/lib/api-validation";
 import { DeleteResponseSchema } from "@/schemas/common";
-import { TrainingJobSchema } from "@/schemas/training";
+import { JobDeleteResponseSchema, TrainingJobSchema } from "@/schemas/training";
 import type { TrainingJobResponse } from "@/schemas/training";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -84,7 +84,7 @@ export function useTrainingJob(jobId: string | null = null) {
 		if (!res.ok) {
 			throw new Error(data.error || "Failed to delete job");
 		}
-		const validated = validateData(data, DeleteResponseSchema);
+		const validated = validateData(data, JobDeleteResponseSchema);
 		return validated;
 	}, [jobId]);
 

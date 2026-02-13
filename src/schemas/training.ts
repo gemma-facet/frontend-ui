@@ -229,6 +229,13 @@ export const EvaluationMetricsSchema = z.object({
 	eval_runtime: z.number().optional(),
 });
 
+export const JobDeleteResponseSchema = z.object({
+	job_id: z.string(),
+	deleted: z.boolean(),
+	message: z.string(),
+	deleted_resources: z.array(z.string()).optional(),
+});
+
 export const TrainingJobSchema = z.object({
 	job_id: z.string(),
 	job_name: z.string().optional(),
@@ -265,3 +272,4 @@ export const TrainingJobSchema = z.object({
 });
 
 export type TrainingJobResponse = z.infer<typeof TrainingJobSchema>;
+export type JobDeleteResponse = z.infer<typeof JobDeleteResponseSchema>;

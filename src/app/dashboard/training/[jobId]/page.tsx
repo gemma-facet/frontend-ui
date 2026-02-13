@@ -139,6 +139,9 @@ export default function JobDetailPage() {
 		setDeleteSuccess(null);
 		try {
 			const data = await deleteJob();
+			if (!data) {
+				throw new Error("Failed to receive deletion confirmation");
+			}
 
 			// Show success popup with deletion details
 			setDeleteSuccess(data);
