@@ -9,7 +9,7 @@ export async function GET(request: Request) {
 		if (!res.ok) throw new Error("Failed to fetch jobs");
 		const data = await res.json();
 		const { jobs } = data as { jobs: TrainingJobResponse[] };
-		return NextResponse.json(jobs);
+		return NextResponse.json({ jobs });
 	} catch (err: unknown) {
 		return NextResponse.json(
 			{

@@ -10,7 +10,7 @@ export async function GET(request: Request) {
 		const data = await res.json();
 		const { datasets } = data as { datasets: DatasetResponse[] };
 
-		return NextResponse.json(datasets);
+		return NextResponse.json({ datasets });
 	} catch (err: unknown) {
 		return NextResponse.json(
 			{
