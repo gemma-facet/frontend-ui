@@ -1,6 +1,9 @@
 import { validateData } from "@/lib/api-validation";
 import { DeleteResponseSchema } from "@/schemas/common";
-import { DatasetDetailSchema } from "@/schemas/dataset";
+import {
+	DatasetDeleteResponseSchema,
+	DatasetDetailSchema,
+} from "@/schemas/dataset";
 import type { DatasetDetail, DatasetDetailState } from "@/types/dataset";
 import { useEffect, useState } from "react";
 
@@ -72,7 +75,7 @@ export const useDatasetDetail = (processedDatasetId: string) => {
 
 		const validated = validateData(
 			await response.json(),
-			DeleteResponseSchema,
+			DatasetDeleteResponseSchema,
 		);
 		return validated;
 	};

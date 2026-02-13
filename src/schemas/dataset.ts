@@ -87,6 +87,14 @@ export const DatasetSynthesisSchema = z.object({
 	batch_size: z.number().int().positive().optional(),
 });
 
+export const DatasetDeleteResponseSchema = z.object({
+	dataset_name: z.string(),
+	deleted: z.boolean(),
+	message: z.string(),
+	deleted_files_count: z.number().optional(),
+	deleted_resources: z.array(z.string()).optional(),
+});
+
 // --- Type Exports ---
 
 export type TextContentPart = z.infer<typeof TextContentPartSchema>;
@@ -101,6 +109,7 @@ export type HFInfoRequest = z.infer<typeof HFInfoSchema>;
 export type HFPreviewRequest = z.infer<typeof HFPreviewSchema>;
 export type DatasetProcessRequest = z.infer<typeof DatasetProcessSchema>;
 export type DatasetSynthesisRequest = z.infer<typeof DatasetSynthesisSchema>;
+export type DatasetDeleteResponse = z.infer<typeof DatasetDeleteResponseSchema>;
 
 // --- Response Schemas ---
 
