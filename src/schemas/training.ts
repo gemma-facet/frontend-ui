@@ -200,26 +200,6 @@ export const TrainRequestSchema = z.object({
 	training_config: TrainingConfigSchema,
 });
 
-// --- Type Exports ---
-
-export type StringCheckRewardConfig = z.infer<typeof StringCheckRewardSchema>;
-export type TextSimilarityRewardConfig = z.infer<
-	typeof TextSimilarityRewardSchema
->;
-export type ScoreModelRewardConfig = z.infer<typeof ScoreModelRewardSchema>;
-export type LabelModelRewardConfig = z.infer<typeof LabelModelRewardSchema>;
-export type PythonRewardConfig = z.infer<typeof PythonRewardSchema>;
-export type BuiltInRewardConfig = z.infer<typeof BuiltInRewardSchema>;
-export type RulerRewardConfig = z.infer<typeof RulerRewardSchema>;
-
-export type TrainRequest = z.infer<typeof TrainRequestSchema>;
-export type TrainingConfig = z.infer<typeof TrainingConfigSchema>;
-export type HyperparameterConfig = z.infer<typeof HyperparameterConfigSchema>;
-export type EvaluationConfig = z.infer<typeof EvaluationConfigSchema>;
-export type WandbConfig = z.infer<typeof WandbConfigSchema>;
-export type ExportConfig = z.infer<typeof ExportConfigSchema>;
-export type AnyGraderConfig = z.infer<typeof AnyGraderConfigSchema>;
-
 // --- Response Schemas ---
 
 export const EvaluationMetricsSchema = z.object({
@@ -260,6 +240,7 @@ export const TrainingJobSchema = z.object({
 	error: z.string().optional(),
 	modality: z.enum(["text", "vision"]).optional(),
 	// ... existing fields
+	// Added to satisfy GetExportResponse interface on the frontend for export status tracking
 	latest_export: z
 		.object({
 			status: z.enum(["pending", "running", "completed", "failed"]),
@@ -270,6 +251,26 @@ export const TrainingJobSchema = z.object({
 		.optional(),
 	metrics: EvaluationMetricsSchema.optional(),
 });
+
+// --- Type Exports ---
+
+export type StringCheckRewardConfig = z.infer<typeof StringCheckRewardSchema>;
+export type TextSimilarityRewardConfig = z.infer<
+	typeof TextSimilarityRewardSchema
+>;
+export type ScoreModelRewardConfig = z.infer<typeof ScoreModelRewardSchema>;
+export type LabelModelRewardConfig = z.infer<typeof LabelModelRewardSchema>;
+export type PythonRewardConfig = z.infer<typeof PythonRewardSchema>;
+export type BuiltInRewardConfig = z.infer<typeof BuiltInRewardSchema>;
+export type RulerRewardConfig = z.infer<typeof RulerRewardSchema>;
+
+export type TrainRequest = z.infer<typeof TrainRequestSchema>;
+export type TrainingConfig = z.infer<typeof TrainingConfigSchema>;
+export type HyperparameterConfig = z.infer<typeof HyperparameterConfigSchema>;
+export type EvaluationConfig = z.infer<typeof EvaluationConfigSchema>;
+export type WandbConfig = z.infer<typeof WandbConfigSchema>;
+export type ExportConfig = z.infer<typeof ExportConfigSchema>;
+export type AnyGraderConfig = z.infer<typeof AnyGraderConfigSchema>;
 
 export type TrainingJobResponse = z.infer<typeof TrainingJobSchema>;
 export type JobDeleteResponse = z.infer<typeof JobDeleteResponseSchema>;

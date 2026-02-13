@@ -40,12 +40,6 @@ export default function TrainingReviewPage() {
 		loading: submitting,
 		error: mutationError,
 	} = useTrainingMutation();
-	// We can use local error state if we want to display it differently or use hook's error directly
-	// The original code used a local error state. Let's keep using the hook's error but we might need
-	// to display it.
-	// Actually, the original code set error state on catch.
-	// The hook also sets error state.
-	// We can use the hook's error.
 
 	useEffect(() => {
 		if (!model) {

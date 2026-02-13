@@ -201,15 +201,6 @@ export default function ExportJobDetailPage() {
 		return <div className="p-8">Export job not found.</div>;
 	}
 
-	// Cast job to GetExportResponse if needed, or rely on hook typing which returns TrainingJobSchema
-	// Note: TrainingJobSchema has latest_export but might differ slightly from GetExportResponse interface
-	// We should ensure compatibility. The hook validates against TrainingJobSchema.
-	// TrainingJobSchema has been updated to include latest_export.
-	// We might need to cast or ensure types align.
-	// The variable `job` from hook is `TrainingJobResponse | null`.
-	// The `GetExportResponse` interface extends `JobSchema` and adds `latest_export`.
-	// Let's rely on structural typing or explicit casting if needed.
-
 	const ModalityIcon = job.modality === "vision" ? ImageIcon : FileTextIcon;
 
 	// Determine if we should show banner and what type

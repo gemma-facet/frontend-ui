@@ -27,8 +27,6 @@ export const ExportRequestSchema = z
 		},
 	);
 
-export type ExportRequest = z.infer<typeof ExportRequestSchema>;
-
 // --- Response Schemas ---
 
 export const JobArtifactsFilesSchema = z.object({
@@ -65,11 +63,6 @@ export const ListExportsResponseSchema = z.object({
 	jobs: z.array(ExportJobListEntrySchema),
 });
 
-export type ExportJobListEntryResponse = z.infer<
-	typeof ExportJobListEntrySchema
->;
-export type ListExportsResponseData = z.infer<typeof ListExportsResponseSchema>;
-
 export const ExportResponseSchema = z
 	.object({
 		success: z.boolean().optional(),
@@ -77,5 +70,14 @@ export const ExportResponseSchema = z
 		job_id: z.string().optional(),
 	})
 	.passthrough();
+
+// --- Type Exports ---
+
+export type ExportRequest = z.infer<typeof ExportRequestSchema>;
+
+export type ExportJobListEntryResponse = z.infer<
+	typeof ExportJobListEntrySchema
+>;
+export type ListExportsResponseData = z.infer<typeof ListExportsResponseSchema>;
 
 export type ExportResponse = z.infer<typeof ExportResponseSchema>;

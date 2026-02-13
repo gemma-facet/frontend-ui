@@ -95,24 +95,6 @@ export const DatasetDeleteResponseSchema = z.object({
 	deleted_resources: z.array(z.string()).optional(),
 });
 
-// --- Type Exports ---
-
-export type TextContentPart = z.infer<typeof TextContentPartSchema>;
-export type ImageContentPart = z.infer<typeof ImageContentPartSchema>;
-export type ContentPart = z.infer<typeof ContentPartSchema>;
-export type MessageContent = z.infer<typeof MessageContentSchema>;
-export type DatasetMessage = z.infer<typeof DatasetMessageSchema>;
-export type DatasetSample = z.infer<typeof DatasetSampleSchema>;
-
-export type HFConfigRequest = z.infer<typeof HFConfigSchema>;
-export type HFInfoRequest = z.infer<typeof HFInfoSchema>;
-export type HFPreviewRequest = z.infer<typeof HFPreviewSchema>;
-export type DatasetProcessRequest = z.infer<typeof DatasetProcessSchema>;
-export type DatasetSynthesisRequest = z.infer<typeof DatasetSynthesisSchema>;
-export type DatasetDeleteResponse = z.infer<typeof DatasetDeleteResponseSchema>;
-
-// --- Response Schemas ---
-
 export const DatasetSchema = z.object({
 	dataset_name: z.string(),
 	dataset_id: z.string(),
@@ -144,6 +126,22 @@ export const DatasetDetailSchema = z.object({
 	modality: z.enum(["text", "vision"]),
 	splits: z.array(DatasetSplitSchema),
 });
+
+// --- Type Exports ---
+
+export type TextContentPart = z.infer<typeof TextContentPartSchema>;
+export type ImageContentPart = z.infer<typeof ImageContentPartSchema>;
+export type ContentPart = z.infer<typeof ContentPartSchema>;
+export type MessageContent = z.infer<typeof MessageContentSchema>;
+export type DatasetMessage = z.infer<typeof DatasetMessageSchema>;
+export type DatasetSample = z.infer<typeof DatasetSampleSchema>;
+
+export type HFConfigRequest = z.infer<typeof HFConfigSchema>;
+export type HFInfoRequest = z.infer<typeof HFInfoSchema>;
+export type HFPreviewRequest = z.infer<typeof HFPreviewSchema>;
+export type DatasetProcessRequest = z.infer<typeof DatasetProcessSchema>;
+export type DatasetSynthesisRequest = z.infer<typeof DatasetSynthesisSchema>;
+export type DatasetDeleteResponse = z.infer<typeof DatasetDeleteResponseSchema>;
 
 export type DatasetResponse = z.infer<typeof DatasetSchema>;
 export type DatasetDetailResponse = z.infer<typeof DatasetDetailSchema>;
