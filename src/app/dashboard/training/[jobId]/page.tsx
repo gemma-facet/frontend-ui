@@ -69,8 +69,14 @@ export default function JobDetailPage() {
 
 	const handleRefresh = async () => {
 		setRefreshing(true);
-		await fetchStatus(undefined, false); // Force refresh
-		setRefreshing(false);
+		try {
+			await fetchStatus(undefined, false); // Force refresh
+		} catch (err) {
+			console.error("Failed to refresh job status:", err);
+			toast.error("Failed to refresh job status");
+		} finally {
+			setRefreshing(false);
+		}
 	};
 
 	// Polling logic

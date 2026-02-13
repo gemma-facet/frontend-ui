@@ -54,7 +54,7 @@ export function useExportMutation() {
 					data: validated,
 				});
 
-				return data;
+				return validated;
 			} catch (error) {
 				const errorMessage =
 					error instanceof Error

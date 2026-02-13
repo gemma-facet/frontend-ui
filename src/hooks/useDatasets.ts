@@ -22,11 +22,16 @@ export function useDatasets() {
 		try {
 			const res = await fetch("/api/datasets");
 			if (!res.ok) {
-				const errorData = await res.json();
-				throw new Error(
-					errorData.error ||
-						`Failed to fetch datasets: ${res.statusText}`,
-				);
+				let errorMessage = `Failed to fetch datasets: ${res.statusText}`;
+				try {
+					const errorData = await res.json();
+					if (errorData.error) {
+						errorMessage = errorData.error;
+					}
+				} catch {
+					// Response wasn't JSON, use default error message
+				}
+				throw new Error(errorMessage);
 			}
 
 			const data = await res.json();
@@ -41,7 +46,14 @@ export function useDatasets() {
 				processed_dataset_id: dataset.processed_dataset_id,
 				datasetSource: (dataset.dataset_source === "upload"
 					? "local"
-					: "huggingface") as "local" | "huggingface",
+					: dataset.dataset_source === "huggingface"
+						? "huggingface"
+						: (() => {
+								console.warn(
+									`Unknown dataset_source: ${dataset.dataset_source}`,
+								);
+								return "huggingface";
+							})()) as "local" | "huggingface",
 				datasetSubset: dataset.dataset_subset,
 				numExamples: dataset.num_examples,
 				createdAt: dataset.created_at,

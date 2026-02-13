@@ -8,7 +8,7 @@ export async function GET(request: Request) {
 		const res = await backendFetch(request, `${API_GATEWAY_URL}/jobs`);
 		if (!res.ok) throw new Error("Failed to fetch jobs");
 		const data = await res.json();
-		const { jobs } = data as { jobs: TrainingJobResponse[] };
+		const { jobs = [] } = data as { jobs?: TrainingJobResponse[] };
 		return NextResponse.json({ jobs });
 	} catch (err: unknown) {
 		return NextResponse.json(

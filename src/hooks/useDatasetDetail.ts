@@ -1,5 +1,4 @@
 import { validateData } from "@/lib/api-validation";
-import { DeleteResponseSchema } from "@/schemas/common";
 import {
 	DatasetDeleteResponseSchema,
 	DatasetDetailSchema,
@@ -69,15 +68,19 @@ export const useDatasetDetail = (processedDatasetId: string) => {
 		);
 
 		if (!response.ok) {
-			const errorData = await response.json();
-			throw new Error(errorData.error || "Failed to delete dataset");
+			let errorMessage = "Failed to delete dataset";
+			try {
+				const errorData = await response.json();
+				errorMessage = errorData.error || errorMessage;
+			} catch {
+				// Response wasn't JSON, use status text
+				errorMessage = `${errorMessage}: ${response.status} ${response.statusText}`;
+			}
+			throw new Error(errorMessage);
 		}
 
-		const validated = validateData(
-			await response.json(),
-			DatasetDeleteResponseSchema,
-		);
-		return validated;
+		const data = await response.json();
+		return validateData(data, DatasetDeleteResponseSchema);
 	};
 
 	return { ...state, deleteDataset };
