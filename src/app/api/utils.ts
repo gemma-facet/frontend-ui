@@ -7,6 +7,10 @@ export function createBackendHeaders(request: Request): Record<string, string> {
 	const headers: Record<string, string> = {};
 	if (token) {
 		headers.Authorization = `Bearer ${token}`;
+	} else {
+		console.warn(
+			"[createBackendHeaders] No Firebase token found in cookies",
+		);
 	}
 
 	return headers;

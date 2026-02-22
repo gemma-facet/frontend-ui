@@ -1,4 +1,5 @@
-// New schema types based on backend changes
+import type { ExportRequest as ExportRequestType } from "@/schemas/export";
+
 export type ExportType = "adapter" | "merged" | "gguf";
 export type ExportStatus = "running" | "completed" | "failed";
 export type ExportVariant = "raw" | "file" | "hf";
@@ -59,13 +60,8 @@ export interface GetExportResponse extends JobSchema {
 	latest_export?: ExportSchema;
 }
 
-export interface ExportRequest {
-	job_id: string;
-	export_type: ExportType;
-	destination: ExportDestination[];
-	hf_token?: string;
-	hf_repo_id?: string;
-}
+// Re-export from Zod Schema
+export type ExportRequest = ExportRequestType;
 
 export interface ExportResponse {
 	success: boolean;

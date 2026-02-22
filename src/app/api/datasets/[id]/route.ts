@@ -1,4 +1,6 @@
+import type { DatasetDetailResponse } from "@/schemas/dataset";
 import { NextResponse } from "next/server";
+import { z } from "zod";
 import { API_GATEWAY_URL } from "../../env";
 import { backendFetch } from "../../utils";
 
@@ -22,7 +24,7 @@ export async function GET(
 			);
 		}
 
-		const data = await response.json();
+		const data: DatasetDetailResponse = await response.json();
 		return NextResponse.json(data);
 	} catch (error) {
 		console.error("Failed to fetch dataset:", error);

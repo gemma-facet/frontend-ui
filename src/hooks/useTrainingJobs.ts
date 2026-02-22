@@ -1,6 +1,9 @@
 import { jobsAtom } from "@/atoms";
+import { validateData } from "@/lib/api-validation";
+import { TrainingJobSchema } from "@/schemas/training";
 import { useAtom } from "jotai";
 import { useCallback, useEffect, useRef } from "react";
+import { z } from "zod";
 
 export function useTrainingJobs() {
 	const [state, setState] = useAtom(jobsAtom);
@@ -22,8 +25,12 @@ export function useTrainingJobs() {
 			if (!res.ok) throw new Error("Failed to fetch training jobs.");
 
 			const data = await res.json();
+			const validatedJobs = validateData(
+				data.jobs,
+				z.array(TrainingJobSchema),
+			);
 			setState({
-				jobs: data.jobs,
+				jobs: validatedJobs,
 				loading: false,
 				error: null,
 				hasFetched: true,

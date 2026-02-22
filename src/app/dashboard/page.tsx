@@ -66,9 +66,13 @@ const DatasetsSection = () => {
 				</div>
 			) : recentDatasets.length > 0 ? (
 				<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-					{recentDatasets.map(dataset => (
+					{recentDatasets.map((dataset, index) => (
 						<DatasetCard
-							key={dataset.processed_dataset_id}
+							key={
+								dataset.datasetId ||
+								dataset.processed_dataset_id ||
+								`dataset-${index}`
+							}
 							dataset={dataset}
 						/>
 					))}

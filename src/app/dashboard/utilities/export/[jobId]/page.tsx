@@ -6,10 +6,12 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioCardGroup, RadioCardGroupItem } from "@/components/ui/radio-card";
+import { useExportMutation } from "@/hooks/useExportMutation";
+import { useTrainingJob } from "@/hooks/useTrainingJob";
 import { cn } from "@/lib/utils";
-import type {
-	ExportDestination,
-	ExportType,
+import {
+	type ExportDestination,
+	type ExportType,
 	GetExportResponse,
 } from "@/types/export";
 import {
@@ -29,9 +31,19 @@ import { toast } from "sonner";
 
 export default function ExportJobDetailPage() {
 	const { jobId } = useParams<{ jobId: string }>();
-	const [job, setJob] = useState<GetExportResponse | null>(null);
-	const [loading, setLoading] = useState(true);
-	const [error, setError] = useState<string | null>(null);
+	const {
+		job,
+		loading: jobLoading,
+		error: jobError,
+		refresh: refreshJob,
+	} = useTrainingJob(jobId);
+
+	const {
+		triggerExport,
+		loading: exportLoading,
+		error: exportError,
+	} = useExportMutation();
+
 	const [exportingType, setExportingType] = useState<ExportType | null>(null);
 	const [hfToken, setHfToken] = useState<string>("");
 
@@ -61,53 +73,13 @@ export default function ExportJobDetailPage() {
 		}
 	}, []);
 
-	// Fetch job data
-	useEffect(() => {
-		const fetchJob = async () => {
-			setLoading(true);
-			setError(null);
-
-			try {
-				const response = await fetch(`/api/jobs/${jobId}`);
-				if (!response.ok) {
-					throw new Error("Failed to fetch export job");
-				}
-
-				const data: GetExportResponse = await response.json();
-				setJob(data);
-			} catch (err: unknown) {
-				setError(err instanceof Error ? err.message : "Unknown error");
-			} finally {
-				setLoading(false);
-			}
-		};
-
-		fetchJob();
-	}, [jobId]);
-
-	const fetchJobStatus = useCallback(async () => {
-		try {
-			const response = await fetch(`/api/jobs/${jobId}`);
-			if (!response.ok) {
-				throw new Error("Failed to fetch export job");
-			}
-
-			const data: GetExportResponse = await response.json();
-			setJob(data);
-
-			// If latest_export status is running, schedule next poll in 10 seconds
-			if (data.latest_export?.status === "running") {
-				polling.current = setTimeout(() => fetchJobStatus(), 10000);
-			}
-		} catch (err: unknown) {
-			setError(err instanceof Error ? err.message : String(err));
-		}
-	}, [jobId]);
-
-	// Start polling if latest_export status is running
+	// Polling logic
 	useEffect(() => {
 		if (job?.latest_export?.status === "running") {
-			polling.current = setTimeout(() => fetchJobStatus(), 10000);
+			polling.current = setTimeout(
+				() => refreshJob(undefined, true),
+				10000,
+			);
 		}
 
 		return () => {
@@ -116,7 +88,7 @@ export default function ExportJobDetailPage() {
 				polling.current = null;
 			}
 		};
-	}, [job?.latest_export?.status, fetchJobStatus]);
+	}, [job?.latest_export?.status, refreshJob]);
 
 	// Cleanup on unmount
 	useEffect(() => {
@@ -125,10 +97,8 @@ export default function ExportJobDetailPage() {
 		};
 	}, []);
 
-	// Removed auto-unselect logic to avoid losing user intent
-
 	const handleExportRequest = async () => {
-		if (!job || !selectedExportType) return;
+		if (!jobId || !selectedExportType) return;
 
 		const destination: ExportDestination[] = [];
 		if (destGcsSelected) destination.push("gcs");
@@ -146,19 +116,10 @@ export default function ExportJobDetailPage() {
 				hf_repo_id: hfRepoId,
 			};
 
-			const response = await fetch(`/api/jobs/${jobId}/export`, {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify(payload),
-			});
-
-			if (!response.ok) {
-				const errorData = await response.json();
-				throw new Error(errorData.error || "Export request failed");
-			}
+			await triggerExport(jobId, payload);
 
 			// After successful request, fetch updated status
-			await fetchJobStatus();
+			await refreshJob();
 			toast.success(`${selectedExportType.toUpperCase()} export started`);
 
 			// Reset state
@@ -221,7 +182,7 @@ export default function ExportJobDetailPage() {
 		return !exportingType && (!!hfToken || !destHfSelected);
 	};
 
-	if (loading) {
+	if (jobLoading && !job) {
 		return (
 			<div className="flex flex-col items-center gap-4 p-8">
 				<Loader2 className="w-8 h-8 animate-spin text-blue-500" />
@@ -232,8 +193,8 @@ export default function ExportJobDetailPage() {
 		);
 	}
 
-	if (error) {
-		return <div className="p-8 text-red-600">Error: {error}</div>;
+	if (jobError) {
+		return <div className="p-8 text-red-600">Error: {jobError}</div>;
 	}
 
 	if (!job) {

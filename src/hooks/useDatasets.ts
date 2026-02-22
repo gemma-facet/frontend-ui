@@ -1,54 +1,65 @@
-import { datasetsAtom } from "@/atoms";
+"use client";
+
+import { validateData } from "@/lib/api-validation";
+import { DatasetSchema } from "@/schemas/dataset";
 import { useAtom } from "jotai";
 import { useCallback, useEffect, useRef } from "react";
+import { z } from "zod";
+import { datasetsAtom } from "../atoms";
 
 export function useDatasets() {
 	const [state, setState] = useAtom(datasetsAtom);
-	const isFetching = useRef(false);
+	// Use a ref to track if we're currently fetching to prevent double-firing in Strict Mode
+	const isFetchingRef = useRef(false);
 
 	const fetchDatasets = useCallback(async () => {
-		if (isFetching.current) return; // Prevent concurrent calls
+		// If already fetching, don't start another request
+		if (isFetchingRef.current) return;
+
+		isFetchingRef.current = true;
+		setState(prev => ({ ...prev, loading: true, error: null }));
 
 		try {
-			isFetching.current = true;
-			setState({
-				datasets: [],
-				loading: true,
-				error: null,
-				hasFetched: true,
-			});
-
 			const res = await fetch("/api/datasets");
-			if (!res.ok) throw new Error("Failed to fetch datasets.");
+			if (!res.ok) {
+				let errorMessage = `Failed to fetch datasets: ${res.statusText}`;
+				try {
+					const errorData = await res.json();
+					if (errorData.error) {
+						errorMessage = errorData.error;
+					}
+				} catch {
+					// Response wasn't JSON, use default error message
+				}
+				throw new Error(errorMessage);
+			}
 
 			const data = await res.json();
-
-			const formattedData = data.datasets.map(
-				(dataset: {
-					dataset_name: string;
-					dataset_id: string;
-					processed_dataset_id: string;
-					dataset_source: "upload" | "huggingface";
-					dataset_subset: string;
-					num_examples: number;
-					created_at: string;
-					splits: string[];
-					modality: "text" | "vision";
-				}) => ({
-					datasetName: dataset.dataset_name,
-					datasetId: dataset.dataset_id,
-					processed_dataset_id: dataset.processed_dataset_id,
-					datasetSource:
-						dataset.dataset_source === "upload"
-							? "local"
-							: "huggingface",
-					datasetSubset: dataset.dataset_subset,
-					numExamples: dataset.num_examples,
-					createdAt: dataset.created_at,
-					splits: dataset.splits,
-					modality: dataset.modality,
-				}),
+			const validatedDatasets = validateData(
+				data.datasets,
+				z.array(DatasetSchema),
 			);
+
+			const formattedData = validatedDatasets.map(dataset => ({
+				datasetName: dataset.dataset_name,
+				datasetId: dataset.dataset_id,
+				processed_dataset_id: dataset.processed_dataset_id,
+				datasetSource: (dataset.dataset_source === "upload"
+					? "local"
+					: dataset.dataset_source === "huggingface"
+						? "huggingface"
+						: (() => {
+								console.warn(
+									`Unknown dataset_source: ${dataset.dataset_source}`,
+								);
+								return "huggingface";
+							})()) as "local" | "huggingface",
+				datasetSubset: dataset.dataset_subset,
+				numExamples: dataset.num_examples,
+				createdAt: dataset.created_at,
+				splits: dataset.splits || [], // Ensure splits is always an array
+				modality: dataset.modality,
+			}));
 
 			setState({
 				datasets: formattedData,
@@ -57,20 +68,23 @@ export function useDatasets() {
 				hasFetched: true,
 			});
 		} catch (error) {
-			setState({
-				datasets: [],
+			console.error("Error fetching datasets:", error);
+			setState(prev => ({
+				...prev,
 				loading: false,
-				error: error instanceof Error ? error.message : "Unknown error",
-				hasFetched: true,
-			});
+				error:
+					error instanceof Error
+						? error.message
+						: "An unknown error occurred",
+			}));
 		} finally {
-			isFetching.current = false;
+			isFetchingRef.current = false;
 		}
 	}, [setState]);
 
 	useEffect(() => {
-		// Only fetch once if we haven't fetched before
-		if (!state.hasFetched) {
+		// Only fetch if we haven't fetched yet and aren't currently fetching
+		if (!state.hasFetched && !isFetchingRef.current) {
 			fetchDatasets();
 		}
 	}, [state.hasFetched, fetchDatasets]);

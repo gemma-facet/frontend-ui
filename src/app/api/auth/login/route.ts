@@ -1,15 +1,17 @@
+import { validateRequest, validationErrorResponse } from "@/lib/api-validation";
+import { LoginSchema } from "@/schemas/auth";
 import { NextResponse } from "next/server";
 
 export async function POST(request: Request) {
-	try {
-		const { token } = await request.json();
-		if (!token) {
-			return NextResponse.json(
-				{ error: "Token is required" },
-				{ status: 400 },
-			);
-		}
+	const validation = await validateRequest(request, LoginSchema);
 
+	if (!validation.success) {
+		return validationErrorResponse(validation.error);
+	}
+
+	const { token } = validation.data;
+
+	try {
 		const response = NextResponse.json({ success: true });
 		response.cookies.set("firebaseIdToken", token, {
 			httpOnly: true,

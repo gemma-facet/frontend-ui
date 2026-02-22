@@ -1,37 +1,20 @@
-import type { InferenceRequest, InferenceResponse } from "@/types/inference";
-import { NextResponse } from "next/server";
+import { validateRequest, validationErrorResponse } from "@/lib/api-validation";
+import { InferenceRequestSchema } from "@/schemas/inference";
+import type { InferenceResponse } from "@/types/inference";
 import { INFERENCE_SERVICE_URL } from "../env";
 import { backendFetch } from "../utils";
 
 export async function POST(request: Request) {
+	const validation = await validateRequest(request, InferenceRequestSchema);
+
+	if (!validation.success) {
+		return validationErrorResponse(validation.error);
+	}
+
+	const body = validation.data;
+
 	try {
-		const body = (await request.json()) as InferenceRequest;
-
-		// Validate required fields
-		if (
-			!body.model_source ||
-			!body.model_type ||
-			!body.base_model_id ||
-			!body.prompt
-		) {
-			return Response.json(
-				{
-					error: "model_source, model_type, base_model_id, and prompt are required",
-				},
-				{ status: 400 },
-			);
-		}
-
-		const baseModelParts = body.base_model_id.split("/");
-		const provider =
-			baseModelParts[0] === "unsloth" ? "unsloth" : "huggingface";
-
-		if (provider === "huggingface" && !body.hf_token) {
-			return Response.json(
-				{ error: "hf_token is required for Hugging Face models" },
-				{ status: 400 },
-			);
-		}
+		// Schema validation already handles required fields and hf_token conditional logic
 
 		const response = await backendFetch(
 			request,

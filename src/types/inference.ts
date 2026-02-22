@@ -1,27 +1,19 @@
-import type { DatasetMessage } from "./dataset";
+import type { DatasetMessage as DatasetMessageType } from "@/schemas/dataset";
+import type {
+	BatchInferenceRequest as BatchInferenceRequestType,
+	EvaluationRequest as EvaluationRequestType,
+	InferenceRequest as InferenceRequestType,
+} from "@/schemas/inference";
 
 export type ModelType = "adapter" | "merged" | "base";
 
-export interface InferenceRequest {
-	hf_token: string;
-	model_source: string;
-	model_type: ModelType;
-	base_model_id: string;
-	prompt: string;
-	use_vllm?: boolean;
-}
+// Re-exporting Zod-inferred types
+export type InferenceRequest = InferenceRequestType;
+export type BatchInferenceRequest = BatchInferenceRequestType;
+export type EvaluationRequest = EvaluationRequestType;
 
 export interface InferenceResponse {
 	result: string;
-}
-
-export interface BatchInferenceRequest {
-	hf_token: string;
-	model_source: string;
-	model_type: ModelType;
-	base_model_id: string;
-	messages: DatasetMessage[][]; // Array of conversations, where each conversation is a list of messages
-	use_vllm?: boolean;
 }
 
 export interface BatchInferenceResponse {
@@ -47,18 +39,8 @@ export type MetricType =
 	| "precision"
 	| "f1";
 
-export interface EvaluationRequest {
-	hf_token: string;
-	model_source: string;
-	model_type: ModelType;
-	base_model_id: string;
-	dataset_id: string;
-	task_type?: TaskType;
-	metrics?: MetricType[];
-	max_samples?: number;
-	num_sample_results?: number;
-	use_vllm?: boolean;
-}
+// DatasetMessage is needed here for SampleResult
+export type DatasetMessage = DatasetMessageType;
 
 export interface SampleResult {
 	prediction: string;
